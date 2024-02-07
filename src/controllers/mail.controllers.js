@@ -5,7 +5,7 @@ const createMailCampaign = async (req, res) => {
     const {
       loggedInUserEmail,
       CampaignTitle,
-      NameFilter,
+      StartDateFilter,
       EmployeesNrFilter,
       JobTitlesFilter,
       IndustriesFilter,
@@ -39,7 +39,7 @@ const createMailCampaign = async (req, res) => {
       date: formattedDate,
       mailCampaignName: CampaignTitle,
       mailCampaignFilters: [
-        { Name: NameFilter },
+        { StartDate: StartDateFilter },
         { EmployeesNr: EmployeesNrFilter },
         { JobTitles: JobTitlesFilter },
         { Industries: IndustriesFilter },
@@ -158,7 +158,8 @@ const editMailCampaignByID = async (req, res) => {
         $set: {
           status: updatedMailCampaignData.status,
           mailCampaignName: updatedMailCampaignData.CampaignTitle,
-          "mailCampaignFilters.0.Name": updatedMailCampaignData.NameFilter,
+          "mailCampaignFilters.0.StartDate":
+            updatedMailCampaignData.StartDateFilter,
           "mailCampaignFilters.1.EmployeesNr":
             updatedMailCampaignData.EmployeesNrFilter,
           "mailCampaignFilters.2.JobTitles":

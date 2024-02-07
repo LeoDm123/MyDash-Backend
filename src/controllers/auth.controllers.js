@@ -1,5 +1,6 @@
 const Users = require("../models/user-model");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 const createUser = async (req, res) => {
   const { userName, userEmail, userPassword } = req.body;
@@ -23,6 +24,10 @@ const createUser = async (req, res) => {
     });
 
     await user.save();
+
+    const payload = {
+      
+    }
 
     res.status(201).json({
       msg: "User registered",
