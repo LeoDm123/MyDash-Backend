@@ -14,9 +14,7 @@ const createMailCampaign = async (req, res) => {
       RevenueFilter,
       DepartmentFilter,
       LocationFilter,
-      Subject,
-      Message,
-      Variant,
+      Stages,
       NoHtml,
       RemoveContacts,
       OnlyVerified,
@@ -49,11 +47,7 @@ const createMailCampaign = async (req, res) => {
         { Department: DepartmentFilter },
         { Location: LocationFilter },
       ],
-      mailCampaignSubjectAndMessage: [
-        { Subject: Subject },
-        { Message: Message },
-        { Variant: Variant },
-      ],
+      mailCampaignSubjectAndMessage: [{ Stages: Stages }],
       mailCampaignOptions: [
         { NoHtml: NoHtml },
         { RemoveContacts: RemoveContacts },
@@ -176,12 +170,8 @@ const editMailCampaignByID = async (req, res) => {
             updatedMailCampaignData.DepartmentFilter,
           "mailCampaignFilters.8.Location":
             updatedMailCampaignData.LocationFilter,
-          "mailCampaignSubjectAndMessage.0.Subject":
-            updatedMailCampaignData.Subject,
-          "mailCampaignSubjectAndMessage.1.Message":
-            updatedMailCampaignData.Message,
-          "mailCampaignSubjectAndMessage.2.Variant":
-            updatedMailCampaignData.Variant,
+          "mailCampaignSubjectAndMessage.0.Stages":
+            updatedMailCampaignData.Stages,
           "mailCampaignOptions.0.NoHtml": updatedMailCampaignData.NoHtml,
           "mailCampaignOptions.1.RemoveContacts":
             updatedMailCampaignData.RemoveContacts,
