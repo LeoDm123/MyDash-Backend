@@ -1,6 +1,7 @@
 const MailsCampaigns = require("../models/mail-model");
 
 const createMailCampaign = async (req, res) => {
+  let session;
   try {
     const {
       loggedInUserEmail,
@@ -62,7 +63,7 @@ const createMailCampaign = async (req, res) => {
       ],
     });
 
-    const session = await MailsCampaigns.startSession();
+    session = await MailsCampaigns.startSession();
     session.startTransaction();
 
     await newMailCampaign.save({ session });
@@ -74,8 +75,10 @@ const createMailCampaign = async (req, res) => {
       .status(200)
       .json({ message: "Mail campaign created successfully" });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    if (session) {
+      await session.abortTransaction();
+      session.endSession();
+    }
 
     console.error(error);
     return res.status(500).json({ message: "Internal server error" });
