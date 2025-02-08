@@ -12,7 +12,8 @@ app.use(cors());
 dbConnection();
 
 app.use("/auth", require("./src/routes/auth"));
-app.use("/scholarship", require("./src/routes/scholarship"));
+app.use("/beca", require("./src/routes/beca"));
+app.use("/parametros", require("./src/routes/parametros"));
 
 app.listen(process.env.PORT, () => {
   console.log(`Servidor corriendo en el puerto ${process.env.PORT}`);

@@ -1,40 +1,86 @@
 const Users = require("../models/user-model");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const sendVerificationEmail = require("../services/emailService");
 
 const createUser = async (req, res) => {
-  const { userEmail, userPassword, ...rest } = req.body;
+  const { email, password, firstName, lastName, ...rest } = req.body;
 
   try {
-    let user = await Users.findOne({ "login.email": userEmail });
+    let user = await Users.findOne({ email });
 
     if (user) {
       return res.status(400).json({
-        msg: "The user already exists",
+        msg: "El usuario ya se encuentra registrado",
       });
     }
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(userPassword, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const verificationToken = crypto.randomBytes(32).toString("hex");
 
     user = new Users({
-      login: {
-        email: userEmail,
-        password: hashedPassword,
-      },
+      email,
+      password: hashedPassword,
+      personalData: { firstName, lastName },
+      verificationToken,
+      emailVerified: false,
       ...rest,
     });
 
     await user.save();
 
+    await sendVerificationEmail(email, verificationToken);
+
     res.status(201).json({
-      msg: "User registered",
+      msg: "Usuario registrado. Verifica tu email antes de iniciar sesión.",
     });
   } catch (error) {
     console.log(error);
     res.status(500).json({
-      msg: "There was a problem registering the user",
+      msg: "Hubo un problema al registrar el usuario",
     });
+  }
+};
+
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).json({ msg: "Token no proporcionado" });
+    }
+
+    const user = await Users.findOne({ verificationToken: token });
+
+    if (!user) {
+      return res.status(400).json({ msg: "Token inválido o expirado." });
+    }
+
+    user.emailVerified = true;
+    user.verificationToken = undefined;
+    await user.save();
+
+    res.send(`
+  <html>
+    <head>
+      <script>
+        setTimeout(function() {
+          window.location.href = "${process.env.FRONTEND_URL}";
+        }, 3000);
+      </script>
+    </head>
+    <body>
+      <h2>✅ ¡Email verificado con éxito!</h2>
+      <p>Redirigiéndote a la página principal...</p>
+    </body>
+  </html>
+`);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: "Error al verificar el email." });
   }
 };
 
@@ -42,22 +88,25 @@ const userLogin = async (req, res) => {
   try {
     const { userEmail, userPassword } = req.body;
 
-    let user = await Users.findOne({ "login.email": userEmail }).exec();
+    let user = await Users.findOne({ email: userEmail });
 
     if (!user) {
       return res.status(401).json({
-        msg: "The email or password are incorrect",
+        msg: "El email o la contraseña son incorrectos.",
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      userPassword,
-      user.login.password
-    );
+    if (!user.emailVerified) {
+      return res.status(401).json({
+        msg: "Debes verificar tu email antes de iniciar sesión.",
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(userPassword, user.password);
 
     if (!isPasswordValid) {
       return res.status(401).json({
-        msg: "The email or password are incorrect",
+        msg: "El email o la contraseña son incorrectos.",
       });
     }
 
@@ -68,7 +117,7 @@ const userLogin = async (req, res) => {
     );
 
     res.status(200).json({
-      msg: "User logged",
+      msg: "Usuario autenticado.",
       token,
       user: {
         role: user.role,
@@ -77,7 +126,7 @@ const userLogin = async (req, res) => {
   } catch (error) {
     console.log(error);
     res.status(500).json({
-      msg: "There was a problem logging in the user",
+      msg: "Hubo un problema al iniciar sesión.",
     });
   }
 };
@@ -86,16 +135,16 @@ const getUserByEmail = async (req, res) => {
   try {
     const { userEmail } = req.query;
 
-    const user = await Users.findOne({ "login.email": userEmail });
+    const user = await Users.findOne({ email: userEmail });
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
     return res.status(200).json(user);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -104,13 +153,13 @@ const getUsers = async (req, res) => {
     const users = await Users.find();
 
     if (!users) {
-      return res.status(404).json({ message: "User data not found" });
+      return res.status(404).json({ message: "Usuarios no encontrados" });
     }
 
     return res.status(200).json(users);
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -119,13 +168,13 @@ const getUserById = async (req, res) => {
     const user = await Users.findById(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
     return res.status(200).json(user);
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -138,9 +187,7 @@ const updateUser = async (req, res) => {
     if (userPassword) {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(userPassword, salt);
-      updateData.login = { email: userEmail, password: hashedPassword };
-    } else {
-      updateData.login = { email: userEmail };
+      updateData.password = hashedPassword;
     }
 
     const updatedUser = await Users.findByIdAndUpdate(
@@ -153,13 +200,13 @@ const updateUser = async (req, res) => {
     );
 
     if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
     return res.status(200).json(updatedUser);
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
@@ -168,18 +215,19 @@ const deleteUser = async (req, res) => {
     const deletedUser = await Users.findByIdAndDelete(req.params.id);
 
     if (!deletedUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
-    return res.status(200).json({ message: "User deleted successfully" });
+    return res.status(200).json({ message: "Usuario eliminado con éxito" });
   } catch (error) {
     console.log(error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
 module.exports = {
   createUser,
+  verifyEmail,
   userLogin,
   getUserByEmail,
   getUsers,
