@@ -35,7 +35,6 @@ const userSchema = Schema({
       startYear: { type: Number, required: false },
       endMonth: { type: Number, required: false },
       endYear: { type: Number, required: false },
-      gpa: { type: Number, required: false },
     },
   ],
   workData: {
