@@ -7,11 +7,10 @@ const becaSchema = new Schema({
   cantCupos: { type: Number, required: false },
   nivelAcademico: { type: String, required: true },
   areaEstudio: { type: String, required: true },
-  institucionPublicadora: { type: String, required: false },
   universidadDestino: { type: String, required: false },
   paisPostulante: { type: [String], required: true },
   entidadBecaria: { type: String, required: false },
-  duración: {
+  duracion: {
     duracionMinima: { type: Number, required: false },
     duracionMaxima: { type: Number, required: false },
     duracionUnidad: { type: String, required: false },
@@ -32,7 +31,11 @@ const becaSchema = new Schema({
     required: true,
   },
   requisitos: {
-    nivelAcademicoMin: { type: String, required: false },
+    nivelAcademicoMin: {
+      type: String,
+      required: false,
+      enum: ["Doctorado", "Grado", "Maestría", "Posdoctorado", "Posgrado"],
+    },
     idiomaCondicion: { type: Boolean, required: false },
     idiomasRequeridos: [
       {
