@@ -10,6 +10,7 @@ const userSchema = Schema({
     lastName: { type: String, required: true },
     birthDate: { type: Date, required: false },
     gender: { type: String, required: false },
+    paisCode: { type: String, required: false },
     phone: { type: String, required: false },
     nationality: { type: String, required: false },
     additionalCitizenship: { type: [String], required: false },
