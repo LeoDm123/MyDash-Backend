@@ -66,6 +66,9 @@ const becaSchema = new Schema({
     sitioWeb: { type: String, required: false },
     correoContacto: { type: String, required: false },
   },
+  destacada: { type: Boolean, required: false },
+  dificultad: { type: Number, required: false },
+  imagen: { type: String, required: false },
 });
 
 module.exports = model("Beca", becaSchema);
