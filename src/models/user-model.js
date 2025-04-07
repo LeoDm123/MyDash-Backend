@@ -6,6 +6,7 @@ const userSchema = Schema({
   emailVerified: { type: Boolean, default: false },
   verificationToken: { type: String, required: false },
   resetToken: { type: String, required: false },
+  resetTokenExpiration: { type: Number, required: false },
   personalData: {
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
