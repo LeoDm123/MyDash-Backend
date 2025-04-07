@@ -17,17 +17,15 @@ const sendEmail = async (email, token, type = "verification") => {
 
   if (type === "reset") {
     subject = "Recuperación de contraseña de cuenta en TodoBeca.com";
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
     html = `<h2>Recuperá tu contraseña</h2>
            <p>Para cambiar tu contraseña, haz clic en el siguiente enlace:</p>
-           <a href="${resetUrl}">Restablecer contraseña</a>
+           <a href="${process.env.FRONTEND_URL}/reset-password" onclick="sessionStorage.setItem('resetToken', '${token}')">Restablecer contraseña</a>
            <p>Este enlace expirará en 1 hora.</p>`;
   } else {
     subject = "Verificación de email en TodoBeca.com";
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
     html = `<h2>Verificá tu email</h2>
            <p>Para completar tu registro, haz clic en el siguiente enlace:</p>
-           <a href="${verificationUrl}">Verificar Email</a>`;
+           <a href="${process.env.FRONTEND_URL}/verify-email" onclick="sessionStorage.setItem('verificationToken', '${token}')">Verificar Email</a>`;
   }
 
   const mailOptions = {
