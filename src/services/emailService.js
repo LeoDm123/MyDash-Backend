@@ -12,6 +12,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const resetUrl = `${process.env.FRONTEND_URL}/reset-password.html?token=${token}`;
+
 const sendEmail = async (email, token, type = "verification") => {
   let subject, html;
 
@@ -19,8 +21,8 @@ const sendEmail = async (email, token, type = "verification") => {
     subject = "Recuperación de contraseña de cuenta en TodoBeca.com";
     html = `<h2>Recuperá tu contraseña</h2>
            <p>Para cambiar tu contraseña, haz clic en el siguiente enlace:</p>
-           <a href="${process.env.FRONTEND_URL}/reset-password.html" onclick="sessionStorage.setItem('resetToken', '${token}')">Restablecer contraseña</a>
-           <p>Este enlace expirará en 1 hora.</p>`;
+           <a href="${resetUrl}">Restablecer contraseña</a>
+           <p>Este enlace expirará en 30 minutos.</p>`;
   } else {
     subject = "Verificación de email en TodoBeca.com";
     html = `<h2>Verificá tu email</h2>
