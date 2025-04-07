@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const resetUrl = `${process.env.FRONTEND_URL}/reset-password.html?token=${token}`;
+const resetUrl = `${process.env.FRONTEND_URL}reset-password.html?token=${token}`;
 
 const sendEmail = async (email, token, type = "verification") => {
   let subject, html;
