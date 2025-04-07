@@ -2,8 +2,7 @@ const Users = require("../models/user-model");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const sendVerificationEmail = require("../services/emailService");
-const sendPassRecoveryEmail = require("../services/passRecoveryEmail");
+const emailService = require("../services/emailService");
 
 const createUser = async (req, res) => {
   const { email, password, firstName, lastName, ...rest } = req.body;
@@ -33,7 +32,7 @@ const createUser = async (req, res) => {
 
     await user.save();
 
-    await sendVerificationEmail(email, verificationToken);
+    await emailService(email, verificationToken);
 
     res.status(201).json({
       msg: "Usuario registrado. Verifica tu email antes de iniciar sesión.",
@@ -243,7 +242,7 @@ const sendPasswordResetEmail = async (req, res) => {
     user.resetTokenExpiration = resetTokenExpiration;
     await user.save();
 
-    await sendPassRecoveryEmail(email, resetToken, "reset");
+    await emailService(email, resetToken, "reset");
 
     res.status(200).json({
       msg: "Email de recuperación de contraseña enviado",
