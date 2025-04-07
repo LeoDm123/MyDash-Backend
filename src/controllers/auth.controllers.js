@@ -225,6 +225,62 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const sendPasswordResetEmail = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await Users.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ msg: "Usuario no encontrado" });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpiration = Date.now() + 1800000; // 1 hour from now
+
+    user.resetToken = resetToken;
+    user.resetTokenExpiration = resetTokenExpiration;
+    await user.save();
+
+    await sendVerificationEmail(email, resetToken, "reset");
+
+    res.status(200).json({
+      msg: "Email de recuperación de contraseña enviado",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: "Error al enviar el email de recuperación" });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    const user = await Users.findOne({
+      resetToken: token,
+      resetTokenExpiration: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ msg: "Token inválido o expirado" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    user.password = hashedPassword;
+    user.resetToken = undefined;
+    user.resetTokenExpiration = undefined;
+    await user.save();
+
+    res.status(200).json({ msg: "Contraseña actualizada con éxito" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: "Error al restablecer la contraseña" });
+  }
+};
+
 module.exports = {
   createUser,
   verifyEmail,
@@ -234,4 +290,6 @@ module.exports = {
   getUserById,
   updateUser,
   deleteUser,
+  sendPasswordResetEmail,
+  resetPassword,
 };
