@@ -253,6 +253,35 @@ const sendPasswordResetEmail = async (req, res) => {
   }
 };
 
+const sendVerificationEmail = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const user = await Users.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ msg: "Usuario no encontrado" });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ msg: "El email ya está verificado" });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    user.verificationToken = verificationToken;
+    await user.save();
+
+    await sendMail(email, verificationToken, "verify");
+
+    res.status(200).json({
+      msg: "Email de verificación enviado",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ msg: "Error al enviar el email de verificación" });
+  }
+};
+
 const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
@@ -291,5 +320,6 @@ module.exports = {
   updateUser,
   deleteUser,
   sendPasswordResetEmail,
+  sendVerificationEmail,
   resetPassword,
 };

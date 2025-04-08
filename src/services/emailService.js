@@ -25,7 +25,7 @@ const sendMail = async (email, token, type = "verify") => {
       <p>Este enlace expirará en 30 minutos.</p>
     `;
   } else {
-    const verifyUrl = `${process.env.EMAIL_VERIFICATION_UR}?token=${token}`;
+    const verifyUrl = `${process.env.EMAIL_VERIFICATION_URL}?token=${token}`;
     subject = "Verificación de email en TodoBeca.com";
     html = `
       <h2>Verificá tu email</h2>
