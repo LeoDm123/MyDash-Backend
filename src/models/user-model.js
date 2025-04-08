@@ -68,6 +68,7 @@ const userSchema = Schema({
     type: String,
     default: "user",
   },
+  imagen: { type: String, required: false },
 });
 
 module.exports = model("User", userSchema);
