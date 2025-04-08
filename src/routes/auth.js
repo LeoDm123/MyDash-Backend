@@ -9,6 +9,7 @@ const {
   updateUser,
   deleteUser,
   sendPasswordResetEmail,
+  sendVerificationEmail,
   resetPassword,
 } = require("../controllers/auth.controllers");
 
@@ -23,6 +24,7 @@ routerAuth.get("/getUserById/:id", getUserById);
 routerAuth.put("/updateUser/:id", updateUser);
 routerAuth.delete("/deleteUser/:id", deleteUser);
 routerAuth.post("/sendPasswordResetEmail", sendPasswordResetEmail);
+routerAuth.post("/sendVerificationEmail", sendVerificationEmail);
 routerAuth.put("/resetPassword", resetPassword);
 
 module.exports = routerAuth;
