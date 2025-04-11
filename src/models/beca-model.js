@@ -67,7 +67,7 @@ const becaSchema = new Schema({
     correoContacto: { type: String, required: false },
   },
   destacada: { type: Boolean, required: false },
-  dificultad: { type: Number, required: false },
+  dificultad: { type: Number, required: true },
   imagen: { type: String, required: false },
 });
 
