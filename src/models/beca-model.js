@@ -1,8 +1,8 @@
 const { Schema, model } = require("mongoose");
 
 const becaSchema = new Schema({
-  paisDestino: { type: String, required: true },
-  regionDestino: { type: String, required: true },
+  paisDestino: { type: [String], required: true },
+  regionDestino: { type: [String], required: true },
   nombreBeca: { type: String, required: true },
   cantCupos: { type: Number, required: false },
   nivelAcademico: { type: String, required: true },
