@@ -35,7 +35,14 @@ const becaSchema = new Schema({
     nivelAcademicoMin: {
       type: String,
       required: false,
-      enum: ["Doctorado", "Grado", "Maestría", "Posdoctorado", "Posgrado"],
+      enum: [
+        "Secundario",
+        "Doctorado",
+        "Grado",
+        "Maestría",
+        "Posdoctorado",
+        "Posgrado",
+      ],
     },
     idiomaCondicion: { type: Boolean, required: false },
     idiomasRequeridos: [
