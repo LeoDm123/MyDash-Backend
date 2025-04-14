@@ -17,6 +17,7 @@ const becaSchema = new Schema({
   },
   fechaInicioAplicacion: { type: String, required: false },
   fechaFinAplicacion: { type: String, required: false },
+  fechaInicioPrograma: { type: String, required: false },
   tipoBeca: {
     type: String,
     enum: [
