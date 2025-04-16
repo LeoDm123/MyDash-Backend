@@ -97,7 +97,7 @@ const userLogin = async (req, res) => {
     }
 
     if (!user.emailVerified) {
-      return res.status(401).json({
+      return res.status(402).json({
         msg: "Debes verificar tu email antes de iniciar sesión.",
       });
     }
