@@ -313,10 +313,12 @@ const resetPassword = async (req, res) => {
 
 const generarSitemapController = async (req, res) => {
   try {
+    console.log("➡️ Ejecutando generación de sitemap...");
     await generarSitemap();
-    res.status(200).json({ message: "✅ Sitemap generado correctamente" });
+    console.log("✅ Sitemap generado exitosamente");
+    res.status(200).json({ message: "Sitemap generado correctamente" });
   } catch (error) {
-    console.error("❌ Error al generar el sitemap:", error);
+    console.error("❌ Error interno:", error);
     res.status(500).json({ message: "Error al generar el sitemap" });
   }
 };

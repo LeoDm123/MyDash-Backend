@@ -11,6 +11,7 @@ const BecaSchema = new mongoose.Schema({
 const Beca = mongoose.models.Beca || mongoose.model("Beca", BecaSchema);
 
 async function generarSitemap() {
+  console.log("📍 Entrando a generarSitemap");
   try {
     if (mongoose.connection.readyState === 0) {
       await mongoose.connect(process.env.DB_CNN, {
