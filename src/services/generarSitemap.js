@@ -52,7 +52,7 @@ async function generarSitemap() {
       "\n"
     )}\n</urlset>`;
 
-    const outputPath = path.join(__dirname, "../src/public/sitemap.xml");
+    const outputPath = path.join(__dirname, "../public/sitemap.xml");
 
     console.log("📝 Escribiendo archivo en:", outputPath);
     fs.writeFileSync(outputPath, sitemap);
@@ -63,6 +63,12 @@ async function generarSitemap() {
     console.error("❌ Error generando sitemap:", error.message);
     throw error;
   }
+}
+
+if (require.main === module) {
+  generarSitemap()
+    .then(() => console.log("✅ Finalizado correctamente."))
+    .catch((err) => console.error("❌ Falló:", err.message));
 }
 
 module.exports = generarSitemap;
