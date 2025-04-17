@@ -313,42 +313,13 @@ const resetPassword = async (req, res) => {
 
 const generarSitemapController = async (req, res) => {
   try {
-    console.log("🔍 Generando sitemap para respuesta directa....");
-
-    await mongoose.connect(process.env.DB_CNN);
-
-    const becas = await Beca.find();
-
-    const urls = becas.map((beca) => {
-      const slug = slugify(beca.nombreBeca || "", {
-        lower: true,
-        strict: true,
-      });
-      const fecha = new Date(beca.updatedAt || new Date())
-        .toISOString()
-        .split("T")[0];
-
-      return `
-  <url>
-    <loc>https://todobeca.com/becas/${slug}</loc>
-    <lastmod>${fecha}</lastmod>
-    <priority>0.9</priority>
-  </url>`;
-    });
-
-    const sitemap =
-      `<?xml version="1.0" encoding="UTF-8"?>\n` +
-      `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-      urls.join("\n") +
-      `\n</urlset>`;
-
-    res.set("Content-Type", "application/xml");
-    return res.status(200).send(sitemap);
+    console.log("➡️ Ejecutando generación de sitemap...");
+    await generarSitemap();
+    console.log("✅ Sitemap generado exitosamente");
+    res.status(200).json({ message: "Sitemap generado correctamente" });
   } catch (error) {
-    console.error("❌ Error generando sitemap:", error.message);
-    res.status(500).json({ message: "Error al generar sitemap" });
-  } finally {
-    mongoose.connection.readyState === 1 && mongoose.disconnect();
+    console.error("❌ Error interno:", error);
+    res.status(500).json({ message: "Error al generar el sitemap" });
   }
 };
 
