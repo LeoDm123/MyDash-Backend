@@ -1,4 +1,5 @@
 const Becas = require("../models/beca-model");
+const generarSitemap = require("../services/generarSitemap");
 
 const crearBeca = async (req, res) => {
   try {
@@ -7,6 +8,8 @@ const crearBeca = async (req, res) => {
     const beca = new Becas(becaData);
 
     await beca.save();
+
+    await generarSitemap();
 
     res.status(201).json({
       msg: "Beca creada exitosamente",
