@@ -27,6 +27,6 @@ routerAuth.delete("/deleteUser/:id", deleteUser);
 routerAuth.post("/sendPasswordResetEmail", sendPasswordResetEmail);
 routerAuth.post("/sendVerificationEmail", sendVerificationEmail);
 routerAuth.put("/resetPassword", resetPassword);
-routerAuth.post("/generarSitemap", generarSitemapController);
+routerAuth.get("/generarSitemap", generarSitemapController);
 
 module.exports = routerAuth;
