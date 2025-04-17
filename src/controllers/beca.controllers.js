@@ -76,6 +76,8 @@ const updateBeca = async (req, res) => {
       msg: "Beca actualizada exitosamente",
       updatedBeca,
     });
+
+    await generarSitemap();
   } catch (error) {
     console.error(error);
     res.status(500).json({
