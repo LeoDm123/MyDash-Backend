@@ -5,6 +5,7 @@ const {
   getBecaById,
   updateBeca,
   deleteBeca,
+  getBecasBySlug,
 } = require("../controllers/beca.controllers");
 
 const routerBeca = express.Router();
@@ -14,5 +15,6 @@ routerBeca.get("/getBecas", getBecas);
 routerBeca.get("/getBecaById/:id", getBecaById);
 routerBeca.put("/updateBeca/:id", updateBeca);
 routerBeca.delete("/deleteBeca/:id", deleteBeca);
+routerBeca.get("/getBecasBySlug/:slug", getBecasBySlug);
 
 module.exports = routerBeca;

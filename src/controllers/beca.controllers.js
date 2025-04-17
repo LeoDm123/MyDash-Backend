@@ -66,6 +66,39 @@ const getBecaById = async (req, res) => {
   }
 };
 
+const getBecasBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const becas = await Becas.find({}, { nombreBeca: 1, _id: 1 });
+
+    const becasConSlug = becas.map((beca) => {
+      const generatedSlug = slugify(beca.nombreBeca || "", {
+        lower: true,
+        strict: true,
+      });
+      return {
+        _id: beca._id,
+        nombreBeca: beca.nombreBeca,
+        slug: generatedSlug,
+      };
+    });
+
+    const becasFiltradas = becasConSlug.filter((b) => b.slug === slug);
+
+    if (becasFiltradas.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No se encontraron becas con ese slug" });
+    }
+
+    res.status(200).json(becasFiltradas);
+  } catch (error) {
+    console.error("Error al buscar becas por slug:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
 const updateBeca = async (req, res) => {
   try {
     const { id } = req.params;
@@ -120,4 +153,5 @@ module.exports = {
   getBecaById,
   updateBeca,
   deleteBeca,
+  getBecasBySlug,
 };
