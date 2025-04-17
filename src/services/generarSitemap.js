@@ -1,14 +1,9 @@
 const fs = require("fs");
+const Becas = require("../models/beca-model");
 const path = require("path");
 const mongoose = require("mongoose");
 const slugify = require("slugify");
 require("dotenv").config();
-
-const BecaSchema = new mongoose.Schema({
-  nombreBeca: String,
-  updatedAt: Date,
-});
-const Beca = mongoose.model("Beca", BecaSchema);
 
 async function generarSitemap() {
   console.log("🔍 Entrando en generarSitemap...");
@@ -22,7 +17,7 @@ async function generarSitemap() {
     console.log("✅ Conectado a MongoDB");
 
     console.log("📦 Buscando becas...");
-    const becas = await Beca.find();
+    const becas = await Becas.find();
 
     if (!becas || becas.length === 0) {
       console.warn("⚠️ No se encontraron becas en la base de datos");
