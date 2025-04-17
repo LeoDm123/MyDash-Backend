@@ -313,7 +313,7 @@ const resetPassword = async (req, res) => {
 
 const generarSitemapController = async (req, res) => {
   try {
-    console.log("🔍 Generando sitemap para respuesta directa...");
+    console.log("🔍 Generando sitemap para respuesta directa....");
 
     await mongoose.connect(process.env.DB_CNN);
 
