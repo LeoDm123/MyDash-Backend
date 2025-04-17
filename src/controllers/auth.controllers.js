@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const sendMail = require("../services/emailService");
+const generarSitemap = require("../services/generarSitemap");
 
 const createUser = async (req, res) => {
   const { email, password, firstName, lastName, ...rest } = req.body;
