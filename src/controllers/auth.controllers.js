@@ -310,6 +310,16 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const generarSitemapController = async (req, res) => {
+  try {
+    await generarSitemap();
+    res.status(200).json({ message: "✅ Sitemap generado correctamente" });
+  } catch (error) {
+    console.error("❌ Error al generar el sitemap:", error);
+    res.status(500).json({ message: "Error al generar el sitemap" });
+  }
+};
+
 module.exports = {
   createUser,
   verifyEmail,
@@ -322,4 +332,5 @@ module.exports = {
   sendPasswordResetEmail,
   sendVerificationEmail,
   resetPassword,
+  generarSitemapController,
 };
