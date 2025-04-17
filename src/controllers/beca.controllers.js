@@ -1,5 +1,6 @@
 const Becas = require("../models/beca-model");
 const generarSitemap = require("../services/generarSitemap");
+const slugify = require("slugify");
 
 const crearBeca = async (req, res) => {
   try {
@@ -50,11 +51,17 @@ const getBecaById = async (req, res) => {
       return res.status(404).json({ message: "Beca no encontrada" });
     }
 
-    res.status(200).json(beca);
+    const becaObj = beca.toObject();
+    becaObj.slug = slugify(beca.nombreBeca || "", {
+      lower: true,
+      strict: true,
+    });
+
+    res.status(200).json(becaObj);
   } catch (error) {
     console.error(error);
     res.status(500).json({
-      msg: "Hubo un problema al obtener las becas",
+      msg: "Hubo un problema al obtener la beca",
     });
   }
 };
