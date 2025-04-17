@@ -77,6 +77,7 @@ const becaSchema = new Schema({
   destacada: { type: Boolean, required: false },
   dificultad: { type: Number, required: true },
   imagen: { type: String, required: false },
+  slug: { type: String, required: false },
 });
 
 module.exports = model("Beca", becaSchema);
