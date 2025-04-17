@@ -40,7 +40,7 @@ async function generarSitemap() {
       "\n"
     )}\n</urlset>`;
 
-    const outputPath = path.join(__dirname, "../src/public/sitemap.xml");
+    const outputPath = path.join(__dirname, "../public/sitemap.xml");
     fs.writeFileSync(outputPath, sitemap);
     console.log("✅ sitemap.xml generado en:", outputPath);
   } catch (error) {
