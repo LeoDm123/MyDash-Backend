@@ -69,7 +69,7 @@ const verifyEmail = async (req, res) => {
     <head>
       <script>
         setTimeout(function() {
-          window.location.href = "${process.env.FRONTEND_URL}";
+          window.location.href = "${process.env.FRONTEND_LOGIN_URL}";
         }, 3000);
       </script>
     </head>
