@@ -272,7 +272,12 @@ const sendVerificationEmail = async (req, res) => {
     user.verificationToken = verificationToken;
     await user.save();
 
-    await sendMail(email, verificationToken, "verify");
+    await sendMail(
+      email,
+      verificationToken,
+      user.personalData.firstName,
+      "verify"
+    );
 
     res.status(200).json({
       msg: "Email de verificación enviado",

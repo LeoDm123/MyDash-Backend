@@ -10,11 +10,11 @@ const userSchema = Schema({
   personalData: {
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
-    birthDate: { type: Date, required: false },
+    birthDate: { type: Date, required: true },
     gender: { type: String, required: false },
     paisCode: { type: String, required: false },
     phone: { type: String, required: false },
-    nationality: { type: String, required: false },
+    nationality: { type: String, required: true },
     additionalCitizenship: { type: [String], required: false },
     currentCity: { type: String, required: false },
     minorityGroups: {

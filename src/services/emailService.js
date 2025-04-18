@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const sendMail = async (email, token, type = "verify") => {
+const sendMail = async (email, token, firstName, type = "verify") => {
   let subject, html;
 
   if (type === "reset") {
@@ -26,11 +26,22 @@ const sendMail = async (email, token, type = "verify") => {
     `;
   } else {
     const verifyUrl = `${process.env.EMAIL_VERIFICATION_URL}?token=${token}`;
-    subject = "Verificación de email en TodoBeca.com";
+    subject = "Validá tu cuenta en TodoBeca.com! 🎓";
     html = `
-      <h2>Verificá tu email</h2>
-      <p>Para completar tu registro, hacé clic en el siguiente enlace:</p>
-      <a href="${verifyUrl}">Verificar Email</a>
+      <h2>¡Hola ${firstName}! </h2>
+      <p>Gracias por registrarte en TodoBeca.com, la plataforma que reúne todas las becas y oportunidades académicas para estudiantes latinoamericanos en un solo lugar.</p>
+      <br>
+      <h6>✈️ ¿Qué podés hacer?</h6>
+      <p>Explorar becas por país, nivel de estudio, área de interés, idioma, tipo de financiamiento y mucho más.</p>
+      <br>
+      <h6>🌐 ¿Cómo sacarle el máximo provecho?</h6>
+      <p>Completá tu perfil, lo que nos permite mostrarte las oportunidades que realmente se ajustan a vos y a lo que estás buscando. Además, vas a poder usar todos los filtros avanzados y funcionalidades que hacen mucho más fácil encontrar esa beca ideal.<strong> Cuanto más completo esté tu perfil, mejores serán las recomendaciones.</strong></p>
+      <br>
+      <p>Activá tu cuenta: <a href="${verifyUrl}">Hacé click aquí</a> para validar tu mail y empezar a usar TodoBeca.com</p>
+      <br>
+      <p>---</p>
+      <br>
+      <h6>El equipo de TodoBeca.com</h6>
     `;
   }
 
