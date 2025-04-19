@@ -1,11 +1,9 @@
-const { Configuration, OpenAIApi } = require("openai");
+const OpenAI = require("openai");
 require("dotenv").config();
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
-const openai = new OpenAIApi(configuration);
 
 const chatWithGPT = async (req, res) => {
   try {
@@ -18,7 +16,7 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    const completion = await openai.createChatCompletion({
+    const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
@@ -35,7 +33,7 @@ const chatWithGPT = async (req, res) => {
       max_tokens: 500,
     });
 
-    const response = completion.data.choices[0].message.content;
+    const response = completion.choices[0].message.content;
 
     res.status(200).json({
       success: true,
