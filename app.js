@@ -16,7 +16,7 @@ dbConnection();
 app.use("/auth", require("./src/routes/auth"));
 app.use("/beca", require("./src/routes/beca"));
 app.use("/parametros", require("./src/routes/parametros"));
-app.use("/api", require("./src/routes/chatRoutes"));
+app.use("/chat", require("./src/routes/chat"));
 
 const {
   generarSitemapController,
