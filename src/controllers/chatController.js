@@ -12,7 +12,7 @@ const chatWithGPT = async (req, res) => {
     if (!message) {
       return res.status(400).json({
         success: false,
-        message: "Message is required",
+        message: "Un mensaje es requerido",
       });
     }
 
@@ -22,7 +22,7 @@ const chatWithGPT = async (req, res) => {
         {
           role: "system",
           content:
-            "You are a helpful assistant for TodoBeca, a scholarship platform. Provide clear and concise answers.",
+            "Eres un asistente útil para TodoBeca, una plataforma de becas. Proporciona respuestas claras y concisas en español.",
         },
         {
           role: "user",
@@ -40,10 +40,10 @@ const chatWithGPT = async (req, res) => {
       response: response,
     });
   } catch (error) {
-    console.error("Error in chatWithGPT:", error);
+    console.error("Error en chatWithGPT:", error);
     res.status(500).json({
       success: false,
-      message: "Error processing your request",
+      message: "Error al procesar tu solicitud",
       error: error.message,
     });
   }
