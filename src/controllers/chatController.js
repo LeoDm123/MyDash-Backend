@@ -1,6 +1,6 @@
 const OpenAI = require("openai");
 require("dotenv").config();
-const Beca = require("../models/Beca");
+const Beca = require("../models/beca-model");
 const ChatSettings = require("../models/chatSettings-model");
 
 const openai = new OpenAI({
