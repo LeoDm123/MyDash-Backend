@@ -143,8 +143,8 @@ const chatWithGPT = async (req, res) => {
           content: message,
         },
       ],
-      temperature: 0.3,
-      max_tokens: 150,
+      temperature: settings.temperature,
+      max_tokens: settings.maxTokens,
     });
 
     // Analizar la respuesta de GPT de manera segura
