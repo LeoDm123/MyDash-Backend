@@ -10,6 +10,15 @@ const openai = new OpenAI({
 // Función auxiliar para buscar becas relevantes
 const buscarBecasRelevantes = async (query) => {
   try {
+    console.log("🔍 Buscando becas relevantes para:", query);
+
+    // Verificar la conexión a la base de datos
+    const db = require("mongoose").connection;
+    if (db.readyState !== 1) {
+      console.error("❌ La base de datos no está conectada");
+      throw new Error("La base de datos no está conectada");
+    }
+
     // Convertir el query a minúsculas para búsqueda case-insensitive
     const queryLower = query.toLowerCase();
 
@@ -92,10 +101,11 @@ const buscarBecasRelevantes = async (query) => {
       ],
     });
 
+    console.log(`✅ Encontradas ${becas.length} becas relevantes`);
     return becas;
   } catch (error) {
-    console.error("Error en buscarBecasRelevantes:", error);
-    return [];
+    console.error("❌ Error en buscarBecasRelevantes:", error);
+    throw error; // Propagar el error para manejarlo en el controlador principal
   }
 };
 
@@ -111,32 +121,55 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
+    console.log("💬 Nuevo mensaje recibido:", message);
+
     // Get active chat settings
     const settings = await ChatSettings.findOne({ isActive: true });
     if (!settings) {
+      console.error(
+        "❌ No se encontraron configuraciones activas para el chat"
+      );
       return res.status(500).json({
         success: false,
         message: "No se encontraron configuraciones activas para el chat",
       });
     }
 
+    console.log("⚙️ Configuración del chat cargada:", settings.model);
+
     // 🔍 Búsqueda dinámica en la base de datos
-    const becasRelevantes = await buscarBecasRelevantes(message);
+    let becasRelevantes = [];
+    try {
+      becasRelevantes = await buscarBecasRelevantes(message);
+    } catch (error) {
+      console.error("❌ Error al buscar becas:", error);
+      // Continuar sin becas en caso de error
+    }
+
     let infoExtra = "";
 
     if (becasRelevantes.length > 0) {
-      infoExtra =
-        "Basado en tu consulta, encontré las siguientes becas relevantes:\n\n";
+      infoExtra = "Información de becas relevantes encontradas:\n\n";
       becasRelevantes.forEach((beca) => {
         infoExtra += `• ${beca.nombreBeca}\n`;
         infoExtra += `  País: ${beca.pais}\n`;
         infoExtra += `  Universidad: ${beca.universidad}\n`;
         if (beca.areaEstudio) infoExtra += `  Área: ${beca.areaEstudio}\n`;
-        if (beca.descripcion)
-          infoExtra += `  Descripción: ${beca.descripcion.substring(
-            0,
-            100
-          )}...\n`;
+        if (beca.tipoBeca) infoExtra += `  Tipo: ${beca.tipoBeca}\n`;
+        if (beca.duracion) {
+          infoExtra += `  Duración: ${beca.duracion.duracionMinima} - ${beca.duracion.duracionMaxima} ${beca.duracion.duracionUnidad}\n`;
+        }
+        if (beca.cobertura) {
+          const coberturas = [];
+          if (beca.cobertura.matricula) coberturas.push("Matrícula");
+          if (beca.cobertura.estipendio) coberturas.push("Estipendio");
+          if (beca.cobertura.pasajes) coberturas.push("Pasajes");
+          if (beca.cobertura.seguroMedico) coberturas.push("Seguro Médico");
+          if (beca.cobertura.alojamiento) coberturas.push("Alojamiento");
+          if (coberturas.length > 0) {
+            infoExtra += `  Cobertura: ${coberturas.join(", ")}\n`;
+          }
+        }
         infoExtra += "\n";
       });
     }
@@ -144,14 +177,13 @@ const chatWithGPT = async (req, res) => {
     // 🧠 Construir el prompt con datos adicionales si los hay
     const promptUsuario = infoExtra ? `${message}\n\n${infoExtra}` : message;
 
+    console.log("🤖 Enviando prompt a OpenAI...");
     const completion = await openai.chat.completions.create({
       model: settings.model,
       messages: [
         {
           role: "system",
-          content:
-            settings.systemPrompt +
-            "\n\nUtiliza la información de becas proporcionada para responder de manera precisa y relevante. Si no hay información relevante, indica que no encontraste becas específicas pero proporciona información general sobre el tema.",
+          content: settings.systemPrompt,
         },
         {
           role: "user",
@@ -163,6 +195,7 @@ const chatWithGPT = async (req, res) => {
     });
 
     const response = completion.choices[0].message.content;
+    console.log("✅ Respuesta generada exitosamente");
 
     res.status(200).json({
       success: true,
@@ -170,7 +203,7 @@ const chatWithGPT = async (req, res) => {
       becasRelevantes: becasRelevantes.length > 0 ? becasRelevantes : null,
     });
   } catch (error) {
-    console.error("Error en chatWithGPT:", error);
+    console.error("❌ Error en chatWithGPT:", error);
     res.status(500).json({
       success: false,
       message: "Error al procesar tu solicitud",

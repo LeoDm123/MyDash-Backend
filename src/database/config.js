@@ -15,10 +15,36 @@ const dbConnection = async () => {
       connectTimeoutMS: 20000,
     });
 
+    // Verificar la conexión
+    const db = mongoose.connection;
+
+    db.on("error", (error) => {
+      console.error("❌ Error en la conexión a MongoDB:", error);
+    });
+
+    db.on("disconnected", () => {
+      console.warn("⚠️ MongoDB desconectado");
+    });
+
+    db.on("reconnected", () => {
+      console.log("🔄 Reconectado a MongoDB");
+    });
+
+    // Verificar que podemos acceder a la base de datos
+    const collections = await mongoose.connection.db
+      .listCollections()
+      .toArray();
+    console.log(
+      "📚 Colecciones disponibles:",
+      collections.map((c) => c.name)
+    );
+
     console.log("✅ Conectado a la base de datos");
   } catch (error) {
-    console.error("❌ Prolemas con la conexion a la base de datos:");
-    console.error(error.message);
+    console.error("❌ Problemas con la conexión a la base de datos:");
+    console.error("Mensaje de error:", error.message);
+    console.error("Stack trace:", error.stack);
+    process.exit(1); // Terminar la aplicación si no podemos conectar
   }
 };
 
