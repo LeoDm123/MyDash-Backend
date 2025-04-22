@@ -55,12 +55,25 @@ const buscarBecas = async (criterios) => {
         if (key.includes(".")) {
           query[key] = value;
         } else {
-          query[key] = value;
+          // Si el campo es un array, usar $in para buscar en el array
+          if (key.endsWith("Destino") || key.endsWith("Postulante")) {
+            query[key] = { $in: [value] };
+          } else {
+            query[key] = value;
+          }
         }
       }
     });
 
     console.log("🔍 Query construido:", JSON.stringify(query, null, 2));
+
+    // Buscar en todos los campos relevantes si no hay criterios específicos
+    if (Object.keys(query).length === 0) {
+      const becas = await Beca.find().limit(10);
+      console.log(`✅ Encontradas ${becas.length} becas (sin criterios)`);
+      return becas;
+    }
+
     const becas = await Beca.find(query).limit(10);
     console.log(`✅ Encontradas ${becas.length} becas`);
 
@@ -106,6 +119,19 @@ const extraerJSON = (texto) => {
   }
 };
 
+// Función auxiliar para obtener todas las becas
+const obtenerTodasBecas = async () => {
+  try {
+    console.log("🔍 Obteniendo todas las becas...");
+    const becas = await Beca.find().select("-_id -__v -createdAt -updatedAt");
+    console.log(`✅ Se obtuvieron ${becas.length} becas`);
+    return becas;
+  } catch (error) {
+    console.error("❌ Error al obtener todas las becas:", error);
+    return [];
+  }
+};
+
 // Chat with GPT
 const chatWithGPT = async (req, res) => {
   try {
@@ -131,18 +157,15 @@ const chatWithGPT = async (req, res) => {
 
     console.log("⚙️ Configuración del chat cargada:", settings.model);
 
-    // Obtener la estructura de la base de datos
-    const estructuraDB = await obtenerEstructuraDB();
-    if (!estructuraDB) {
-      console.error("❌ No se pudo obtener la estructura de la base de datos");
+    // Obtener todas las becas
+    const todasBecas = await obtenerTodasBecas();
+    if (todasBecas.length === 0) {
+      console.error("❌ No se encontraron becas en la base de datos");
       return res.status(500).json({
         success: false,
-        message: "No se pudo obtener la estructura de la base de datos",
+        message: "No se encontraron becas en la base de datos",
       });
     }
-
-    // Obtener el total de becas
-    const totalBecas = await contarBecas();
 
     // Llamada a GPT para analizar y responder
     console.log("🤖 Enviando mensaje a GPT para análisis...");
@@ -153,16 +176,26 @@ const chatWithGPT = async (req, res) => {
           role: "system",
           content: `${settings.systemPrompt}
 
-          Tienes acceso a una base de datos de becas con la siguiente estructura:
-          ${JSON.stringify(estructuraDB, null, 2)}
-
-          El total de becas en la base de datos es: ${totalBecas}
+          Tienes acceso a una base de datos con ${todasBecas.length} becas. 
+          Cada beca tiene la siguiente estructura:
+          - nombreBeca: Nombre de la beca
+          - paisDestino: Array de países de destino
+          - regionDestino: Array de regiones de destino
+          - areaEstudio: Área de estudio
+          - nivelAcademico: Nivel académico requerido
+          - tipoBeca: Tipo de beca
+          - universidadDestino: Universidad de destino
+          - entidadBecaria: Entidad que otorga la beca
+          - cobertura: Objeto con información sobre la cobertura
+          - requisitos: Objeto con los requisitos
+          - duracion: Objeto con la duración
+          - informacionAdicional: Objeto con información adicional
 
           IMPORTANTE: Debes responder SOLO con un objeto JSON que contenga los criterios de búsqueda.
           Si necesitas buscar becas, usa este formato:
           {
             "buscar": {
-              "pais": "Argentina",
+              "paisDestino": "Argentina",
               "areaEstudio": "Medicina"
             }
           }
@@ -214,7 +247,7 @@ const chatWithGPT = async (req, res) => {
           role: "assistant",
           content: JSON.stringify({
             becasEncontradas: becasEncontradas,
-            totalBecas: totalBecas,
+            totalBecas: todasBecas.length,
           }),
         },
       ],
