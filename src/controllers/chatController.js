@@ -57,6 +57,25 @@ const contarBecas = async () => {
   }
 };
 
+// Función auxiliar para extraer JSON de una cadena
+const extraerJSON = (texto) => {
+  try {
+    // Buscar el primer { y el último }
+    const inicio = texto.indexOf("{");
+    const fin = texto.lastIndexOf("}");
+
+    if (inicio === -1 || fin === -1) {
+      return { buscar: {} };
+    }
+
+    const jsonStr = texto.substring(inicio, fin + 1);
+    return JSON.parse(jsonStr);
+  } catch (error) {
+    console.error("Error al extraer JSON:", error);
+    return { buscar: {} };
+  }
+};
+
 // Chat with GPT
 const chatWithGPT = async (req, res) => {
   try {
@@ -103,8 +122,8 @@ const chatWithGPT = async (req, res) => {
 
           El total de becas en la base de datos es: ${totalBecas}
 
-          Para buscar becas, responde con un objeto JSON que contenga los criterios de búsqueda.
-          Ejemplo:
+          IMPORTANTE: Debes responder SOLO con un objeto JSON que contenga los criterios de búsqueda.
+          Si necesitas buscar becas, usa este formato:
           {
             "buscar": {
               "pais": "Argentina",
@@ -112,10 +131,12 @@ const chatWithGPT = async (req, res) => {
             }
           }
 
-          Si no necesitas buscar becas, responde con un objeto JSON vacío:
+          Si no necesitas buscar becas, responde con:
           {
             "buscar": {}
-          }`,
+          }
+
+          NO incluyas ningún otro texto en tu respuesta.`,
         },
         {
           role: "user",
@@ -126,8 +147,8 @@ const chatWithGPT = async (req, res) => {
       max_tokens: 150,
     });
 
-    // Analizar la respuesta de GPT
-    const respuestaGPT = JSON.parse(completion.choices[0].message.content);
+    // Analizar la respuesta de GPT de manera segura
+    const respuestaGPT = extraerJSON(completion.choices[0].message.content);
     let becasEncontradas = [];
 
     // Si GPT indica que necesita buscar, realizamos la búsqueda
