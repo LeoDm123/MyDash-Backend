@@ -237,18 +237,34 @@ const chatWithGPT = async (req, res) => {
       messages: [
         {
           role: "system",
-          content: settings.systemPrompt,
+          content: `${settings.systemPrompt}
+
+          IMPORTANTE: Debes responder basándote EXCLUSIVAMENTE en la información proporcionada.
+          No inventes información ni hagas suposiciones.
+          
+          Información de búsqueda:
+          - Total de becas en la base de datos: ${todasBecas.length}
+          - Becas encontradas: ${becasEncontradas.length}
+          ${
+            becasEncontradas.length > 0
+              ? `- Detalles de las becas encontradas: ${JSON.stringify(
+                  becasEncontradas.map((b) => ({
+                    nombreBeca: b.nombreBeca,
+                    paisDestino: b.paisDestino,
+                    areaEstudio: b.areaEstudio,
+                    nivelAcademico: b.nivelAcademico,
+                  })),
+                  null,
+                  2
+                )}`
+              : ""
+          }
+
+          Responde de manera clara y concisa, usando solo la información proporcionada.`,
         },
         {
           role: "user",
           content: message,
-        },
-        {
-          role: "assistant",
-          content: JSON.stringify({
-            becasEncontradas: becasEncontradas,
-            totalBecas: todasBecas.length,
-          }),
         },
       ],
       temperature: settings.temperature,
