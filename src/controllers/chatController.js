@@ -14,6 +14,7 @@ Debés devolver un objeto JSON con las claves relevantes según la base de datos
 Campos posibles:
 - tipoBeca
 - paisDestino
+- regionDestinos
 - paisPostulante
 - areaEstudio
 - nivelAcademico
@@ -89,7 +90,7 @@ const chatWithGPT = async (req, res) => {
 
     const becasFiltradas = await Beca.find(query)
       .select(
-        "nombreBeca paisDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional"
+        "nombreBeca paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional"
       )
       .limit(30); // limitamos para evitar tokens de más
 
