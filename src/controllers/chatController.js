@@ -10,14 +10,30 @@ const openai = new OpenAI({
 // Función auxiliar para obtener la estructura de la base de datos
 const obtenerEstructuraDB = async () => {
   try {
-    // Obtener una beca de ejemplo para ver su estructura
-    const becaEjemplo = await Beca.findOne();
-    if (!becaEjemplo) return null;
+    console.log("🔍 Intentando obtener estructura de la base de datos...");
 
-    // Convertir a objeto plano para evitar problemas con Mongoose
-    return JSON.parse(JSON.stringify(becaEjemplo));
+    // Obtener una beca de ejemplo
+    const becaEjemplo = await Beca.findOne();
+    console.log("📄 Beca ejemplo encontrada:", becaEjemplo ? "Sí" : "No");
+
+    if (!becaEjemplo) {
+      console.log("❌ No se encontró ninguna beca en la base de datos");
+      return null;
+    }
+
+    // Convertir a objeto plano y limpiar campos innecesarios
+    const estructura = JSON.parse(JSON.stringify(becaEjemplo));
+
+    // Eliminar campos que no son relevantes para la búsqueda
+    delete estructura._id;
+    delete estructura.__v;
+    delete estructura.createdAt;
+    delete estructura.updatedAt;
+
+    console.log("✅ Estructura obtenida:", JSON.stringify(estructura, null, 2));
+    return estructura;
   } catch (error) {
-    console.error("Error al obtener estructura de la base de datos:", error);
+    console.error("❌ Error al obtener estructura de la base de datos:", error);
     return null;
   }
 };
@@ -25,6 +41,11 @@ const obtenerEstructuraDB = async () => {
 // Función auxiliar para buscar becas según los criterios proporcionados
 const buscarBecas = async (criterios) => {
   try {
+    console.log(
+      "🔍 Buscando becas con criterios:",
+      JSON.stringify(criterios, null, 2)
+    );
+
     const query = {};
 
     // Construir la consulta dinámicamente basada en los criterios
@@ -39,10 +60,13 @@ const buscarBecas = async (criterios) => {
       }
     });
 
+    console.log("🔍 Query construido:", JSON.stringify(query, null, 2));
     const becas = await Beca.find(query).limit(10);
+    console.log(`✅ Encontradas ${becas.length} becas`);
+
     return becas;
   } catch (error) {
-    console.error("Error en buscarBecas:", error);
+    console.error("❌ Error en buscarBecas:", error);
     return [];
   }
 };
@@ -50,9 +74,11 @@ const buscarBecas = async (criterios) => {
 // Función auxiliar para contar el total de becas
 const contarBecas = async () => {
   try {
-    return await Beca.countDocuments();
+    const total = await Beca.countDocuments();
+    console.log(`📊 Total de becas en la base de datos: ${total}`);
+    return total;
   } catch (error) {
-    console.error("Error al contar becas:", error);
+    console.error("❌ Error al contar becas:", error);
     return 0;
   }
 };
@@ -60,18 +86,22 @@ const contarBecas = async () => {
 // Función auxiliar para extraer JSON de una cadena
 const extraerJSON = (texto) => {
   try {
+    console.log("📝 Intentando extraer JSON de:", texto);
+
     // Buscar el primer { y el último }
     const inicio = texto.indexOf("{");
     const fin = texto.lastIndexOf("}");
 
     if (inicio === -1 || fin === -1) {
+      console.log("⚠️ No se encontró JSON en la respuesta");
       return { buscar: {} };
     }
 
     const jsonStr = texto.substring(inicio, fin + 1);
+    console.log("📦 JSON extraído:", jsonStr);
     return JSON.parse(jsonStr);
   } catch (error) {
-    console.error("Error al extraer JSON:", error);
+    console.error("❌ Error al extraer JSON:", error);
     return { buscar: {} };
   }
 };
@@ -80,6 +110,7 @@ const extraerJSON = (texto) => {
 const chatWithGPT = async (req, res) => {
   try {
     const { message } = req.body;
+    console.log("💬 Nuevo mensaje recibido:", message);
 
     if (!message) {
       return res.status(400).json({
@@ -91,15 +122,19 @@ const chatWithGPT = async (req, res) => {
     // Get active chat settings
     const settings = await ChatSettings.findOne({ isActive: true });
     if (!settings) {
+      console.error("❌ No se encontraron configuraciones activas");
       return res.status(500).json({
         success: false,
         message: "No se encontraron configuraciones activas para el chat",
       });
     }
 
+    console.log("⚙️ Configuración del chat cargada:", settings.model);
+
     // Obtener la estructura de la base de datos
     const estructuraDB = await obtenerEstructuraDB();
     if (!estructuraDB) {
+      console.error("❌ No se pudo obtener la estructura de la base de datos");
       return res.status(500).json({
         success: false,
         message: "No se pudo obtener la estructura de la base de datos",
@@ -110,6 +145,7 @@ const chatWithGPT = async (req, res) => {
     const totalBecas = await contarBecas();
 
     // Llamada a GPT para analizar y responder
+    console.log("🤖 Enviando mensaje a GPT para análisis...");
     const completion = await openai.chat.completions.create({
       model: settings.model,
       messages: [
@@ -147,6 +183,11 @@ const chatWithGPT = async (req, res) => {
       max_tokens: settings.maxTokens,
     });
 
+    console.log(
+      "📥 Respuesta de GPT recibida:",
+      completion.choices[0].message.content
+    );
+
     // Analizar la respuesta de GPT de manera segura
     const respuestaGPT = extraerJSON(completion.choices[0].message.content);
     let becasEncontradas = [];
@@ -157,6 +198,7 @@ const chatWithGPT = async (req, res) => {
     }
 
     // Segunda llamada a GPT para generar la respuesta final
+    console.log("🤖 Generando respuesta final...");
     const respuestaFinal = await openai.chat.completions.create({
       model: settings.model,
       messages: [
@@ -181,6 +223,7 @@ const chatWithGPT = async (req, res) => {
     });
 
     const response = respuestaFinal.choices[0].message.content;
+    console.log("✅ Respuesta final generada");
 
     res.status(200).json({
       success: true,
@@ -188,7 +231,7 @@ const chatWithGPT = async (req, res) => {
       becasRelevantes: becasEncontradas.length > 0 ? becasEncontradas : null,
     });
   } catch (error) {
-    console.error("Error en chatWithGPT:", error);
+    console.error("❌ Error en chatWithGPT:", error);
     res.status(500).json({
       success: false,
       message: "Error al procesar tu solicitud",
