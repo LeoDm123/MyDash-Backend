@@ -7,6 +7,98 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Función auxiliar para buscar becas relevantes
+const buscarBecasRelevantes = async (query) => {
+  try {
+    // Convertir el query a minúsculas para búsqueda case-insensitive
+    const queryLower = query.toLowerCase();
+
+    // Buscar en múltiples campos que podrían ser relevantes
+    const becas = await Beca.find({
+      $or: [
+        { nombreBeca: { $regex: queryLower, $options: "i" } },
+        { "duracion.duracionMinima": { $regex: queryLower, $options: "i" } },
+        { "duracion.duracionMaxima": { $regex: queryLower, $options: "i" } },
+        { "duracion.duracionUnidad": { $regex: queryLower, $options: "i" } },
+        { fechaInicioAplicacion: { $regex: queryLower, $options: "i" } },
+        { fechaFinAplicacion: { $regex: queryLower, $options: "i" } },
+        { fechaInicioPrograma: { $regex: queryLower, $options: "i" } },
+        { tipoBeca: { $regex: queryLower, $options: "i" } },
+        {
+          "requisitos.nivelAcademicoMin": { $regex: queryLower, $options: "i" },
+        },
+        { "requisitos.idiomaCondicion": { $regex: queryLower, $options: "i" } },
+        {
+          "requisitos.idiomasRequeridos.idioma": {
+            $regex: queryLower,
+            $options: "i",
+          },
+        },
+        {
+          "requisitos.idiomasRequeridos.nivelIdioma": {
+            $regex: queryLower,
+            $options: "i",
+          },
+        },
+        {
+          "requisitos.avalUnivProcedencia": {
+            $regex: queryLower,
+            $options: "i",
+          },
+        },
+        { "requisitos.avalUnivDestino": { $regex: queryLower, $options: "i" } },
+        { "requisitos.edadMax": { $regex: queryLower, $options: "i" } },
+        {
+          "requisitos.cartaRecomendacion": {
+            $regex: queryLower,
+            $options: "i",
+          },
+        },
+        {
+          "requisitos.promedioCondicion": { $regex: queryLower, $options: "i" },
+        },
+        { "requisitos.promedioMin": { $regex: queryLower, $options: "i" } },
+        { "requisitos.necesidadEconom": { $regex: queryLower, $options: "i" } },
+        {
+          "requisitos.examenesRequeridos": {
+            $regex: queryLower,
+            $options: "i",
+          },
+        },
+        { "requisitos.otros": { $regex: queryLower, $options: "i" } },
+        { "cobertura.matricula": { $regex: queryLower, $options: "i" } },
+        { "cobertura.estipendio": { $regex: queryLower, $options: "i" } },
+        { "cobertura.pasajes": { $regex: queryLower, $options: "i" } },
+        { "cobertura.seguroMedico": { $regex: queryLower, $options: "i" } },
+        { "cobertura.alojamiento": { $regex: queryLower, $options: "i" } },
+        { "cobertura.montoMensualMin": { $regex: queryLower, $options: "i" } },
+        { "cobertura.montoMensualMax": { $regex: queryLower, $options: "i" } },
+        {
+          "informacionAdicional.sitioWeb": {
+            $regex: queryLower,
+            $options: "i",
+          },
+        },
+        {
+          "informacionAdicional.correoContacto": {
+            $regex: queryLower,
+            $options: "i",
+          },
+        },
+        { destacada: { $regex: queryLower, $options: "i" } },
+        { dificultad: { $regex: queryLower, $options: "i" } },
+        { imagen: { $regex: queryLower, $options: "i" } },
+        { slug: { $regex: queryLower, $options: "i" } },
+      ],
+    });
+
+    return becas;
+  } catch (error) {
+    console.error("Error en buscarBecasRelevantes:", error);
+    return [];
+  }
+};
+
 // Chat with GPT
 const chatWithGPT = async (req, res) => {
   try {
@@ -28,15 +120,25 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    // 🔍 Búsqueda condicional en Mongo (ejemplo básico: menciona 'Argentina')
+    // 🔍 Búsqueda dinámica en la base de datos
+    const becasRelevantes = await buscarBecasRelevantes(message);
     let infoExtra = "";
-    if (message.toLowerCase().includes("argentina")) {
-      const becas = await Beca.find({ pais: "Argentina" }).limit(3);
-      if (becas.length > 0) {
-        infoExtra =
-          "Estas son algunas becas en Argentina:\n" +
-          becas.map((beca) => `• ${beca.nombreBeca}`).join("\n");
-      }
+
+    if (becasRelevantes.length > 0) {
+      infoExtra =
+        "Basado en tu consulta, encontré las siguientes becas relevantes:\n\n";
+      becasRelevantes.forEach((beca) => {
+        infoExtra += `• ${beca.nombreBeca}\n`;
+        infoExtra += `  País: ${beca.pais}\n`;
+        infoExtra += `  Universidad: ${beca.universidad}\n`;
+        if (beca.areaEstudio) infoExtra += `  Área: ${beca.areaEstudio}\n`;
+        if (beca.descripcion)
+          infoExtra += `  Descripción: ${beca.descripcion.substring(
+            0,
+            100
+          )}...\n`;
+        infoExtra += "\n";
+      });
     }
 
     // 🧠 Construir el prompt con datos adicionales si los hay
@@ -47,7 +149,9 @@ const chatWithGPT = async (req, res) => {
       messages: [
         {
           role: "system",
-          content: settings.systemPrompt,
+          content:
+            settings.systemPrompt +
+            "\n\nUtiliza la información de becas proporcionada para responder de manera precisa y relevante. Si no hay información relevante, indica que no encontraste becas específicas pero proporciona información general sobre el tema.",
         },
         {
           role: "user",
@@ -63,6 +167,7 @@ const chatWithGPT = async (req, res) => {
     res.status(200).json({
       success: true,
       response: response,
+      becasRelevantes: becasRelevantes.length > 0 ? becasRelevantes : null,
     });
   } catch (error) {
     console.error("Error en chatWithGPT:", error);
