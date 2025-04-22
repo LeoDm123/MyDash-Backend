@@ -47,6 +47,16 @@ const buscarBecas = async (criterios) => {
   }
 };
 
+// Función auxiliar para contar el total de becas
+const contarBecas = async () => {
+  try {
+    return await Beca.countDocuments();
+  } catch (error) {
+    console.error("Error al contar becas:", error);
+    return 0;
+  }
+};
+
 // Chat with GPT
 const chatWithGPT = async (req, res) => {
   try {
@@ -77,34 +87,34 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    // Primera llamada a GPT para analizar el mensaje y determinar qué buscar
-    const analisis = await openai.chat.completions.create({
+    // Obtener el total de becas
+    const totalBecas = await contarBecas();
+
+    // Llamada a GPT para analizar y responder
+    const completion = await openai.chat.completions.create({
       model: settings.model,
       messages: [
         {
           role: "system",
-          content: `Eres un asistente experto en becas. Analiza el mensaje del usuario y determina qué información buscar en la base de datos.
-          
-          La base de datos tiene la siguiente estructura:
+          content: `${settings.systemPrompt}
+
+          Tienes acceso a una base de datos de becas con la siguiente estructura:
           ${JSON.stringify(estructuraDB, null, 2)}
-          
-          Analiza el mensaje del usuario y responde con un objeto JSON que contenga:
-          1. Los campos que necesitas buscar
-          2. Los valores específicos a buscar en cada campo
-          
-          Ejemplo de respuesta:
+
+          El total de becas en la base de datos es: ${totalBecas}
+
+          Para buscar becas, responde con un objeto JSON que contenga los criterios de búsqueda.
+          Ejemplo:
           {
-            "necesitaBuscar": true,
-            "criterios": {
+            "buscar": {
               "pais": "Argentina",
-              "areaEstudio": "Medicina",
-              "requisitos.nivelAcademicoMin": "Licenciatura"
+              "areaEstudio": "Medicina"
             }
           }
-          
-          Si el mensaje no requiere buscar en la base de datos, responde:
+
+          Si no necesitas buscar becas, responde con un objeto JSON vacío:
           {
-            "necesitaBuscar": false
+            "buscar": {}
           }`,
         },
         {
@@ -116,16 +126,17 @@ const chatWithGPT = async (req, res) => {
       max_tokens: 150,
     });
 
-    const analisisRespuesta = JSON.parse(analisis.choices[0].message.content);
+    // Analizar la respuesta de GPT
+    const respuestaGPT = JSON.parse(completion.choices[0].message.content);
     let becasEncontradas = [];
 
     // Si GPT indica que necesita buscar, realizamos la búsqueda
-    if (analisisRespuesta.necesitaBuscar) {
-      becasEncontradas = await buscarBecas(analisisRespuesta.criterios);
+    if (respuestaGPT.buscar && Object.keys(respuestaGPT.buscar).length > 0) {
+      becasEncontradas = await buscarBecas(respuestaGPT.buscar);
     }
 
     // Segunda llamada a GPT para generar la respuesta final
-    const completion = await openai.chat.completions.create({
+    const respuestaFinal = await openai.chat.completions.create({
       model: settings.model,
       messages: [
         {
@@ -140,7 +151,7 @@ const chatWithGPT = async (req, res) => {
           role: "assistant",
           content: JSON.stringify({
             becasEncontradas: becasEncontradas,
-            criteriosDeBusqueda: analisisRespuesta.criterios || {},
+            totalBecas: totalBecas,
           }),
         },
       ],
@@ -148,7 +159,7 @@ const chatWithGPT = async (req, res) => {
       max_tokens: settings.maxTokens,
     });
 
-    const response = completion.choices[0].message.content;
+    const response = respuestaFinal.choices[0].message.content;
 
     res.status(200).json({
       success: true,
