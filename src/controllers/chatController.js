@@ -7,104 +7,43 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Función auxiliar para buscar becas relevantes
-const buscarBecasRelevantes = async (query) => {
+// Función auxiliar para obtener la estructura de la base de datos
+const obtenerEstructuraDB = async () => {
   try {
-    console.log("🔍 Buscando becas relevantes para:", query);
+    // Obtener una beca de ejemplo para ver su estructura
+    const becaEjemplo = await Beca.findOne();
+    if (!becaEjemplo) return null;
 
-    // Verificar la conexión a la base de datos
-    const db = require("mongoose").connection;
-    if (db.readyState !== 1) {
-      console.error("❌ La base de datos no está conectada");
-      throw new Error("La base de datos no está conectada");
-    }
+    // Convertir a objeto plano para evitar problemas con Mongoose
+    return JSON.parse(JSON.stringify(becaEjemplo));
+  } catch (error) {
+    console.error("Error al obtener estructura de la base de datos:", error);
+    return null;
+  }
+};
 
-    // Convertir el query a minúsculas para búsqueda case-insensitive
-    const queryLower = query.toLowerCase();
+// Función auxiliar para buscar becas según los criterios proporcionados
+const buscarBecas = async (criterios) => {
+  try {
+    const query = {};
 
-    // Buscar en múltiples campos que podrían ser relevantes
-    const becas = await Beca.find({
-      $or: [
-        { nombreBeca: { $regex: queryLower, $options: "i" } },
-        { "duracion.duracionMinima": { $regex: queryLower, $options: "i" } },
-        { "duracion.duracionMaxima": { $regex: queryLower, $options: "i" } },
-        { "duracion.duracionUnidad": { $regex: queryLower, $options: "i" } },
-        { fechaInicioAplicacion: { $regex: queryLower, $options: "i" } },
-        { fechaFinAplicacion: { $regex: queryLower, $options: "i" } },
-        { fechaInicioPrograma: { $regex: queryLower, $options: "i" } },
-        { tipoBeca: { $regex: queryLower, $options: "i" } },
-        {
-          "requisitos.nivelAcademicoMin": { $regex: queryLower, $options: "i" },
-        },
-        { "requisitos.idiomaCondicion": { $regex: queryLower, $options: "i" } },
-        {
-          "requisitos.idiomasRequeridos.idioma": {
-            $regex: queryLower,
-            $options: "i",
-          },
-        },
-        {
-          "requisitos.idiomasRequeridos.nivelIdioma": {
-            $regex: queryLower,
-            $options: "i",
-          },
-        },
-        {
-          "requisitos.avalUnivProcedencia": {
-            $regex: queryLower,
-            $options: "i",
-          },
-        },
-        { "requisitos.avalUnivDestino": { $regex: queryLower, $options: "i" } },
-        { "requisitos.edadMax": { $regex: queryLower, $options: "i" } },
-        {
-          "requisitos.cartaRecomendacion": {
-            $regex: queryLower,
-            $options: "i",
-          },
-        },
-        {
-          "requisitos.promedioCondicion": { $regex: queryLower, $options: "i" },
-        },
-        { "requisitos.promedioMin": { $regex: queryLower, $options: "i" } },
-        { "requisitos.necesidadEconom": { $regex: queryLower, $options: "i" } },
-        {
-          "requisitos.examenesRequeridos": {
-            $regex: queryLower,
-            $options: "i",
-          },
-        },
-        { "requisitos.otros": { $regex: queryLower, $options: "i" } },
-        { "cobertura.matricula": { $regex: queryLower, $options: "i" } },
-        { "cobertura.estipendio": { $regex: queryLower, $options: "i" } },
-        { "cobertura.pasajes": { $regex: queryLower, $options: "i" } },
-        { "cobertura.seguroMedico": { $regex: queryLower, $options: "i" } },
-        { "cobertura.alojamiento": { $regex: queryLower, $options: "i" } },
-        { "cobertura.montoMensualMin": { $regex: queryLower, $options: "i" } },
-        { "cobertura.montoMensualMax": { $regex: queryLower, $options: "i" } },
-        {
-          "informacionAdicional.sitioWeb": {
-            $regex: queryLower,
-            $options: "i",
-          },
-        },
-        {
-          "informacionAdicional.correoContacto": {
-            $regex: queryLower,
-            $options: "i",
-          },
-        },
-        { destacada: { $regex: queryLower, $options: "i" } },
-        { imagen: { $regex: queryLower, $options: "i" } },
-        { slug: { $regex: queryLower, $options: "i" } },
-      ],
+    // Construir la consulta dinámicamente basada en los criterios
+    Object.entries(criterios).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        // Manejar campos anidados
+        if (key.includes(".")) {
+          query[key] = value;
+        } else {
+          query[key] = value;
+        }
+      }
     });
 
-    console.log(`✅ Encontradas ${becas.length} becas relevantes`);
+    const becas = await Beca.find(query).limit(10);
     return becas;
   } catch (error) {
-    console.error("❌ Error en buscarBecasRelevantes:", error);
-    throw error; // Propagar el error para manejarlo en el controlador principal
+    console.error("Error en buscarBecas:", error);
+    return [];
   }
 };
 
@@ -120,63 +59,72 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    console.log("💬 Nuevo mensaje recibido:", message);
-
     // Get active chat settings
     const settings = await ChatSettings.findOne({ isActive: true });
     if (!settings) {
-      console.error(
-        "❌ No se encontraron configuraciones activas para el chat"
-      );
       return res.status(500).json({
         success: false,
         message: "No se encontraron configuraciones activas para el chat",
       });
     }
 
-    console.log("⚙️ Configuración del chat cargada:", settings.model);
-
-    // 🔍 Búsqueda dinámica en la base de datos
-    let becasRelevantes = [];
-    try {
-      becasRelevantes = await buscarBecasRelevantes(message);
-    } catch (error) {
-      console.error("❌ Error al buscar becas:", error);
-      // Continuar sin becas en caso de error
-    }
-
-    let infoExtra = "";
-
-    if (becasRelevantes.length > 0) {
-      infoExtra = "Información de becas relevantes encontradas:\n\n";
-      becasRelevantes.forEach((beca) => {
-        infoExtra += `• ${beca.nombreBeca}\n`;
-        infoExtra += `  País: ${beca.pais}\n`;
-        infoExtra += `  Universidad: ${beca.universidad}\n`;
-        if (beca.areaEstudio) infoExtra += `  Área: ${beca.areaEstudio}\n`;
-        if (beca.tipoBeca) infoExtra += `  Tipo: ${beca.tipoBeca}\n`;
-        if (beca.duracion) {
-          infoExtra += `  Duración: ${beca.duracion.duracionMinima} - ${beca.duracion.duracionMaxima} ${beca.duracion.duracionUnidad}\n`;
-        }
-        if (beca.cobertura) {
-          const coberturas = [];
-          if (beca.cobertura.matricula) coberturas.push("Matrícula");
-          if (beca.cobertura.estipendio) coberturas.push("Estipendio");
-          if (beca.cobertura.pasajes) coberturas.push("Pasajes");
-          if (beca.cobertura.seguroMedico) coberturas.push("Seguro Médico");
-          if (beca.cobertura.alojamiento) coberturas.push("Alojamiento");
-          if (coberturas.length > 0) {
-            infoExtra += `  Cobertura: ${coberturas.join(", ")}\n`;
-          }
-        }
-        infoExtra += "\n";
+    // Obtener la estructura de la base de datos
+    const estructuraDB = await obtenerEstructuraDB();
+    if (!estructuraDB) {
+      return res.status(500).json({
+        success: false,
+        message: "No se pudo obtener la estructura de la base de datos",
       });
     }
 
-    // 🧠 Construir el prompt con datos adicionales si los hay
-    const promptUsuario = infoExtra ? `${message}\n\n${infoExtra}` : message;
+    // Primera llamada a GPT para analizar el mensaje y determinar qué buscar
+    const analisis = await openai.chat.completions.create({
+      model: settings.model,
+      messages: [
+        {
+          role: "system",
+          content: `Eres un asistente experto en becas. Analiza el mensaje del usuario y determina qué información buscar en la base de datos.
+          
+          La base de datos tiene la siguiente estructura:
+          ${JSON.stringify(estructuraDB, null, 2)}
+          
+          Analiza el mensaje del usuario y responde con un objeto JSON que contenga:
+          1. Los campos que necesitas buscar
+          2. Los valores específicos a buscar en cada campo
+          
+          Ejemplo de respuesta:
+          {
+            "necesitaBuscar": true,
+            "criterios": {
+              "pais": "Argentina",
+              "areaEstudio": "Medicina",
+              "requisitos.nivelAcademicoMin": "Licenciatura"
+            }
+          }
+          
+          Si el mensaje no requiere buscar en la base de datos, responde:
+          {
+            "necesitaBuscar": false
+          }`,
+        },
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 150,
+    });
 
-    console.log("🤖 Enviando prompt a OpenAI...");
+    const analisisRespuesta = JSON.parse(analisis.choices[0].message.content);
+    let becasEncontradas = [];
+
+    // Si GPT indica que necesita buscar, realizamos la búsqueda
+    if (analisisRespuesta.necesitaBuscar) {
+      becasEncontradas = await buscarBecas(analisisRespuesta.criterios);
+    }
+
+    // Segunda llamada a GPT para generar la respuesta final
     const completion = await openai.chat.completions.create({
       model: settings.model,
       messages: [
@@ -186,7 +134,14 @@ const chatWithGPT = async (req, res) => {
         },
         {
           role: "user",
-          content: promptUsuario,
+          content: message,
+        },
+        {
+          role: "assistant",
+          content: JSON.stringify({
+            becasEncontradas: becasEncontradas,
+            criteriosDeBusqueda: analisisRespuesta.criterios || {},
+          }),
         },
       ],
       temperature: settings.temperature,
@@ -194,15 +149,14 @@ const chatWithGPT = async (req, res) => {
     });
 
     const response = completion.choices[0].message.content;
-    console.log("✅ Respuesta generada exitosamente");
 
     res.status(200).json({
       success: true,
       response: response,
-      becasRelevantes: becasRelevantes.length > 0 ? becasRelevantes : null,
+      becasRelevantes: becasEncontradas.length > 0 ? becasEncontradas : null,
     });
   } catch (error) {
-    console.error("❌ Error en chatWithGPT:", error);
+    console.error("Error en chatWithGPT:", error);
     res.status(500).json({
       success: false,
       message: "Error al procesar tu solicitud",
