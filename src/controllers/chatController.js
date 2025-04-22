@@ -95,7 +95,6 @@ const buscarBecasRelevantes = async (query) => {
           },
         },
         { destacada: { $regex: queryLower, $options: "i" } },
-        { dificultad: { $regex: queryLower, $options: "i" } },
         { imagen: { $regex: queryLower, $options: "i" } },
         { slug: { $regex: queryLower, $options: "i" } },
       ],
