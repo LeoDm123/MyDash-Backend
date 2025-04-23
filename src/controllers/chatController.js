@@ -41,9 +41,12 @@ Si no hay filtros, devolvé: {}
 
 const chatWithGPT = async (req, res) => {
   try {
-    const { message, email } = req.body;
+    const { message, userData } = req.body;
     console.log("💬 Nuevo mensaje recibido:", message);
-    console.log("👤 Email del usuario:", email || "No proporcionado");
+    console.log(
+      "👤 Datos del usuario:",
+      userData ? "Proporcionados" : "No proporcionados"
+    );
 
     if (!message) {
       return res.status(400).json({
@@ -61,18 +64,6 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    // Obtener información del usuario si se proporciona email
-    let usuarioInfo = null;
-    if (email) {
-      usuarioInfo = await Usuario.findOne({ email }).select(
-        "personalData academicData languages scholarshipProfile -_id -__v -password -emailVerified -verificationToken -resetToken -resetTokenExpiration"
-      );
-      console.log(
-        "👤 Información del usuario encontrada:",
-        usuarioInfo ? "Sí" : "No"
-      );
-    }
-
     // Paso 1: pedirle a GPT que extraiga filtros de la pregunta y considere el perfil del usuario
     const filtroGPT = await openai.chat.completions.create({
       model: settings.model,
@@ -82,18 +73,22 @@ const chatWithGPT = async (req, res) => {
           content: `${extraerFiltrosPrompt}
           
           ${
-            usuarioInfo
+            userData
               ? `Perfil del usuario:
           Datos personales:
-          - Nacionalidad: ${usuarioInfo.personalData.nationality}
-          - Ciudad actual: ${usuarioInfo.personalData.currentCity}
+          - Nacionalidad: ${
+            userData.personalData?.nationality || "No especificada"
+          }
+          - Ciudad actual: ${
+            userData.personalData?.currentCity || "No especificada"
+          }
           - Grupos minoritarios: ${
-            usuarioInfo.personalData.minorityGroups?.join(", ") || "Ninguno"
+            userData.personalData?.minorityGroups?.join(", ") || "Ninguno"
           }
           
           Datos académicos:
           ${
-            usuarioInfo.academicData
+            userData.academicData
               ?.map(
                 (acad) => `
           - Título: ${acad.degree}
@@ -105,37 +100,16 @@ const chatWithGPT = async (req, res) => {
           
           Idiomas:
           ${
-            usuarioInfo.languages
+            userData.languages
               ?.map((lang) => `- ${lang.language}: ${lang.level}`)
               .join("\n") || "No hay idiomas registrados"
-          }
-
-          Intereses en becas:
-          - Áreas de interés: ${
-            usuarioInfo.scholarshipProfile?.areasOfInterest?.join(", ") ||
-            "No especificadas"
-          }
-          - Regiones de interés: ${
-            usuarioInfo.scholarshipProfile?.regionsOfInterest?.join(", ") ||
-            "No especificadas"
-          }
-          - Países de interés: ${
-            usuarioInfo.scholarshipProfile?.countriesOfInterest?.join(", ") ||
-            "No especificados"
-          }
-          - Tipos de beca: ${
-            usuarioInfo.scholarshipProfile?.scholarshipTypes?.join(", ") ||
-            "No especificados"
           }
           
           Basándote en esta información, extrae los filtros más relevantes para el usuario.
           Considera:
           1. Su nacionalidad para becas específicas por país
           2. Su nivel académico actual para becas acordes
-          3. Los idiomas que habla para becas que requieran esos idiomas
-          4. Sus áreas de interés para becas relacionadas
-          5. Sus regiones y países de interés
-          6. Los tipos de beca que le interesan`
+          3. Los idiomas que habla para becas que requieran esos idiomas`
               : ""
           }`,
         },
@@ -153,37 +127,16 @@ const chatWithGPT = async (req, res) => {
     }
 
     // Agregar filtros automáticos basados en el perfil del usuario
-    if (usuarioInfo) {
+    if (userData) {
       // Filtro por nacionalidad
-      if (usuarioInfo.personalData.nationality) {
-        filtros.paisPostulante = usuarioInfo.personalData.nationality;
+      if (userData.personalData?.nationality) {
+        filtros.paisPostulante = userData.personalData.nationality;
       }
 
       // Filtro por idiomas
-      if (usuarioInfo.languages?.length > 0) {
+      if (userData.languages?.length > 0) {
         filtros["requisitos.idiomasRequeridos.idioma"] = {
-          $in: usuarioInfo.languages.map((lang) => lang.language),
-        };
-      }
-
-      // Filtro por áreas de interés
-      if (usuarioInfo.scholarshipProfile?.areasOfInterest?.length > 0) {
-        filtros.areaEstudio = {
-          $in: usuarioInfo.scholarshipProfile.areasOfInterest,
-        };
-      }
-
-      // Filtro por países de interés
-      if (usuarioInfo.scholarshipProfile?.countriesOfInterest?.length > 0) {
-        filtros.paisDestino = {
-          $in: usuarioInfo.scholarshipProfile.countriesOfInterest,
-        };
-      }
-
-      // Filtro por tipos de beca de interés
-      if (usuarioInfo.scholarshipProfile?.scholarshipTypes?.length > 0) {
-        filtros.tipoBeca = {
-          $in: usuarioInfo.scholarshipProfile.scholarshipTypes,
+          $in: userData.languages.map((lang) => lang.language),
         };
       }
     }
@@ -219,18 +172,22 @@ const chatWithGPT = async (req, res) => {
         {
           role: "system",
           content: `${
-            usuarioInfo
+            userData
               ? `Perfil del usuario:
           Datos personales:
-          - Nacionalidad: ${usuarioInfo.personalData.nationality}
-          - Ciudad actual: ${usuarioInfo.personalData.currentCity}
+          - Nacionalidad: ${
+            userData.personalData?.nationality || "No especificada"
+          }
+          - Ciudad actual: ${
+            userData.personalData?.currentCity || "No especificada"
+          }
           - Grupos minoritarios: ${
-            usuarioInfo.personalData.minorityGroups?.join(", ") || "Ninguno"
+            userData.personalData?.minorityGroups?.join(", ") || "Ninguno"
           }
           
           Datos académicos:
           ${
-            usuarioInfo.academicData
+            userData.academicData
               ?.map(
                 (acad) => `
           - Título: ${acad.degree}
@@ -242,27 +199,9 @@ const chatWithGPT = async (req, res) => {
           
           Idiomas:
           ${
-            usuarioInfo.languages
+            userData.languages
               ?.map((lang) => `- ${lang.language}: ${lang.level}`)
               .join("\n") || "No hay idiomas registrados"
-          }
-
-          Intereses en becas:
-          - Áreas de interés: ${
-            usuarioInfo.scholarshipProfile?.areasOfInterest?.join(", ") ||
-            "No especificadas"
-          }
-          - Regiones de interés: ${
-            usuarioInfo.scholarshipProfile?.regionsOfInterest?.join(", ") ||
-            "No especificadas"
-          }
-          - Países de interés: ${
-            usuarioInfo.scholarshipProfile?.countriesOfInterest?.join(", ") ||
-            "No especificados"
-          }
-          - Tipos de beca: ${
-            usuarioInfo.scholarshipProfile?.scholarshipTypes?.join(", ") ||
-            "No especificados"
           }
           
           Considera esta información al generar la respuesta.`
