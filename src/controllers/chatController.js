@@ -139,6 +139,35 @@ const chatWithGPT = async (req, res) => {
           $in: userData.languages.map((lang) => lang.language),
         };
       }
+
+      // Filtro por nivel académico
+      if (userData.academicData?.length > 0) {
+        const nivelesAcademicos = userData.academicData.map(
+          (acad) => acad.degree
+        );
+        filtros.nivelAcademico = { $in: nivelesAcademicos };
+      }
+
+      // Filtro por áreas de interés
+      if (userData.scholarshipProfile?.areasOfInterest?.length > 0) {
+        filtros.areaEstudio = {
+          $in: userData.scholarshipProfile.areasOfInterest,
+        };
+      }
+
+      // Filtro por países de interés
+      if (userData.scholarshipProfile?.countriesOfInterest?.length > 0) {
+        filtros.paisDestino = {
+          $in: userData.scholarshipProfile.countriesOfInterest,
+        };
+      }
+
+      // Filtro por tipos de beca de interés
+      if (userData.scholarshipProfile?.scholarshipTypes?.length > 0) {
+        filtros.tipoBeca = {
+          $in: userData.scholarshipProfile.scholarshipTypes,
+        };
+      }
     }
 
     console.log("🔍 Filtros aplicados:", JSON.stringify(filtros, null, 2));
@@ -147,7 +176,11 @@ const chatWithGPT = async (req, res) => {
     const query = {};
     for (const [key, value] of Object.entries(filtros)) {
       if (key.includes(".")) {
-        query[key] = value;
+        const [parent, child] = key.split(".");
+        if (!query[parent]) {
+          query[parent] = {};
+        }
+        query[parent][child] = value;
       } else if (Array.isArray(value)) {
         query[key] = { $in: value };
       } else {
@@ -155,11 +188,15 @@ const chatWithGPT = async (req, res) => {
       }
     }
 
+    console.log("🔍 Query final:", JSON.stringify(query, null, 2));
+
     const becasFiltradas = await Beca.find(query)
       .select(
         "nombreBeca paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
       )
       .limit(30);
+
+    console.log("🔍 Becas encontradas:", becasFiltradas.length);
 
     // Paso 3: reenviar la consulta del usuario + las becas encontradas para que GPT genere la respuesta final
     const finalResponse = await openai.chat.completions.create({
