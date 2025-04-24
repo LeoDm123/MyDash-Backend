@@ -211,8 +211,6 @@ const chatWithGPT = async (req, res) => {
           Estas son las becas encontradas según los filtros extraídos:
           ${JSON.stringify(becasFiltradas, null, 2)}
 
-          IMPORTANTE: Cuando menciones becas en tu respuesta, solo debes mencionar el nombre de la beca y convertirlo en un link usando el formato markdown [nombre de la beca](https://todobecas.com/becas/{slug}). 
-          Por ejemplo, si una beca se llama "Beca Fulbright" y su slug es "beca-fulbright", debes escribir: [Beca Fulbright](https://todobecas.com/becas/beca-fulbright).
           
           Responde de manera clara y útil, considerando el perfil del usuario y sus intereses.`,
         },
