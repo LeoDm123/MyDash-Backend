@@ -56,7 +56,8 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    // Get active chat settings
+    // Obtener configuración activa
+    console.log("🛠️ Buscando configuración activa...");
     const settings = await ChatSettings.findOne({ isActive: true });
     if (!settings) {
       return res.status(500).json({
@@ -65,7 +66,7 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    // PASO 1: Extraer filtros de la consulta usando ChatGPT
+    // PASO 1: Extraer filtros de la consulta
     console.log("🔍 Paso 1: Extrayendo filtros de la consulta...");
     const filtroGPT = await openai.chat.completions.create({
       model: settings.model,
@@ -89,46 +90,35 @@ const chatWithGPT = async (req, res) => {
     }
     console.log("📋 Filtros extraídos:", filtros);
 
-    // PASO 2: Extraer información del usuario si está disponible
+    // PASO 2: Procesar información del usuario
     console.log("👤 Paso 2: Procesando información del usuario...");
     const userFilters = {};
     if (userData) {
-      // Filtro por nacionalidad
       if (userData.personalData?.nationality) {
         userFilters.paisPostulante = userData.personalData.nationality;
       }
-
-      // Filtro por idiomas
       if (userData.languages?.length > 0) {
         const idiomasUsuario = userData.languages.map((lang) => lang.language);
         userFilters["requisitos.idiomasRequeridos.idioma"] = {
           $in: idiomasUsuario,
         };
       }
-
-      // Filtro por nivel académico
       if (userData.academicData?.length > 0) {
         const nivelesAcademicos = userData.academicData.map(
           (acad) => acad.degree
         );
         userFilters.nivelAcademico = { $in: nivelesAcademicos };
       }
-
-      // Filtro por áreas de interés
       if (userData.scholarshipProfile?.areasOfInterest?.length > 0) {
         userFilters.areaEstudio = {
           $in: userData.scholarshipProfile.areasOfInterest,
         };
       }
-
-      // Filtro por países de interés
       if (userData.scholarshipProfile?.countriesOfInterest?.length > 0) {
         userFilters.paisDestino = {
           $in: userData.scholarshipProfile.countriesOfInterest,
         };
       }
-
-      // Filtro por tipos de beca de interés
       if (userData.scholarshipProfile?.scholarshipTypes?.length > 0) {
         userFilters.tipoBeca = {
           $in: userData.scholarshipProfile.scholarshipTypes,
@@ -137,17 +127,17 @@ const chatWithGPT = async (req, res) => {
     }
     console.log("📋 Filtros del usuario:", userFilters);
 
-    // PASO 3: Construir query final y buscar becas
-    console.log("🔍 Paso 3: Buscando becas...");
+    // PASO 3: Construir query final
+    console.log("🔨 Paso 3: Construyendo query de búsqueda...");
     const query = {};
 
-    // Agregar filtros de la consulta
     for (const [key, value] of Object.entries(filtros)) {
+      console.log(
+        `➡️ Agregando filtro de consulta: ${key} = ${JSON.stringify(value)}`
+      );
       if (key.includes(".")) {
         const [parent, child] = key.split(".");
-        if (!query[parent]) {
-          query[parent] = {};
-        }
+        if (!query[parent]) query[parent] = {};
         query[parent][child] = value;
       } else if (Array.isArray(value)) {
         query[key] = { $in: value };
@@ -156,31 +146,44 @@ const chatWithGPT = async (req, res) => {
       }
     }
 
-    // Agregar filtros del usuario (solo si no existen en los filtros de la consulta)
     for (const [key, value] of Object.entries(userFilters)) {
       if (!query[key]) {
+        console.log(
+          `➡️ Agregando filtro de usuario: ${key} = ${JSON.stringify(value)}`
+        );
         query[key] = value;
       }
     }
 
-    console.log("🔍 Query final:", JSON.stringify(query, null, 2));
+    console.log("✅ Query final construida:", JSON.stringify(query, null, 2));
 
-    // Buscar las becas que cumplen con los filtros básicos
+    // Buscar las becas que cumplen con los filtros
+    console.log("🔎 Buscando becas...");
     let becasFiltradas = await Beca.find(query)
       .select(
         "nombreBeca paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
       )
       .limit(30);
 
-    console.log("🔍 Becas encontradas (pre-match):", becasFiltradas.length);
+    console.log(
+      `🔎 Becas encontradas (sin filtrar requisitos): ${becasFiltradas.length}`
+    );
 
-    // PASO 3.5: Filtrar por match real con requisitos si hay datos del usuario
+    // PASO 3.5: Aplicar validación de requisitos
+    console.log("🛠️ Verificando requisitos específicos...");
     if (userData) {
+      let totalCumplen = 0;
+      let totalFaltanDatos = 0;
+      let totalNoCumplen = 0;
+
       becasFiltradas = becasFiltradas
         .map((beca) => {
           const cumple = cumpleRequisitos(userData, beca);
+          const nombreBeca = beca.nombreBeca || "(sin nombre)";
 
           if (cumple === "Faltan Datos") {
+            console.log(`⚠️ Faltan datos para evaluar: ${nombreBeca}`);
+            totalFaltanDatos++;
             return {
               ...beca.toObject(),
               cumpleRequisitos:
@@ -189,18 +192,28 @@ const chatWithGPT = async (req, res) => {
           }
 
           if (cumple === true) {
+            console.log(`✅ Cumple requisitos: ${nombreBeca}`);
+            totalCumplen++;
             return {
               ...beca.toObject(),
               cumpleRequisitos: "Cumple con los requisitos",
             };
           }
 
-          // En caso de que NO cumpla
+          console.log(`❌ No cumple requisitos: ${nombreBeca}`);
+          totalNoCumplen++;
           return null;
         })
-        .filter((beca) => beca !== null); // Eliminar becas que no cumplen
+        .filter((beca) => beca !== null);
+
+      console.log(`🏁 Resultado filtrado:
+      ✅ Cumplen requisitos: ${totalCumplen}
+      ⚠️ Faltan datos: ${totalFaltanDatos}
+      ❌ No cumplen requisitos: ${totalNoCumplen}`);
     } else {
-      // Si no hay datos de usuario, dejar todas pero aclarar que no se pudo determinar
+      console.log(
+        "🧑 No hay datos del usuario ➔ No se realiza verificación de requisitos."
+      );
       becasFiltradas = becasFiltradas.map((beca) => ({
         ...beca.toObject(),
         cumpleRequisitos:
@@ -208,10 +221,12 @@ const chatWithGPT = async (req, res) => {
       }));
     }
 
-    console.log("✅ Becas filtradas (post-match):", becasFiltradas.length);
+    console.log(
+      `🎯 Total final de becas que se enviarán: ${becasFiltradas.length}`
+    );
 
-    // PASO 4: Generar respuesta final con ChatGPT
-    console.log("💬 Paso 4: Generando respuesta final...");
+    // PASO 4: Generar respuesta final
+    console.log("💬 Paso 4: Generando respuesta final para el usuario...");
     const finalResponse = await openai.chat.completions.create({
       model: settings.model,
       messages: [
@@ -241,8 +256,7 @@ const chatWithGPT = async (req, res) => {
               ?.map(
                 (acad) => `
           - Título: ${acad.degree}
-          - Disciplina: ${acad.discipline}
-          `
+          - Disciplina: ${acad.discipline}`
               )
               .join("\n") || "No hay datos académicos registrados"
           }
