@@ -165,24 +165,50 @@ const chatWithGPT = async (req, res) => {
 
     console.log("🔍 Query final:", JSON.stringify(query, null, 2));
 
+    // Buscar las becas que cumplen con los filtros básicos
     let becasFiltradas = await Beca.find(query)
       .select(
         "nombreBeca paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
       )
       .limit(30);
 
-    console.log("🔍 Becas encontradas:", becasFiltradas.length);
+    console.log("🔍 Becas encontradas (pre-match):", becasFiltradas.length);
 
-    // Si hay datos de usuario, verificar requisitos para cada beca
+    // PASO 3.5: Filtrar por match real con requisitos si hay datos del usuario
     if (userData) {
-      becasFiltradas = becasFiltradas.map((beca) => {
-        const cumple = cumpleRequisitos(userData, beca);
-        return {
-          ...beca.toObject(),
-          cumpleRequisitos: cumple,
-        };
-      });
+      becasFiltradas = becasFiltradas
+        .map((beca) => {
+          const cumple = cumpleRequisitos(userData, beca);
+
+          if (cumple === "Faltan Datos") {
+            return {
+              ...beca.toObject(),
+              cumpleRequisitos:
+                "Cargar perfil para determinar si cumplís con los requisitos",
+            };
+          }
+
+          if (cumple === true) {
+            return {
+              ...beca.toObject(),
+              cumpleRequisitos: "Cumple con los requisitos",
+            };
+          }
+
+          // En caso de que NO cumpla
+          return null;
+        })
+        .filter((beca) => beca !== null); // Eliminar becas que no cumplen
+    } else {
+      // Si no hay datos de usuario, dejar todas pero aclarar que no se pudo determinar
+      becasFiltradas = becasFiltradas.map((beca) => ({
+        ...beca.toObject(),
+        cumpleRequisitos:
+          "Cargar perfil para determinar si cumplís con los requisitos",
+      }));
     }
+
+    console.log("✅ Becas filtradas (post-match):", becasFiltradas.length);
 
     // PASO 4: Generar respuesta final con ChatGPT
     console.log("💬 Paso 4: Generando respuesta final...");
