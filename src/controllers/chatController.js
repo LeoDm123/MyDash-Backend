@@ -3,6 +3,7 @@ require("dotenv").config();
 const Beca = require("../models/beca-model");
 const ChatSettings = require("../models/chatSettings-model");
 const Usuario = require("../models/user-model");
+const { cumpleRequisitos } = require("../utils/scholarshipMatch");
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -164,13 +165,24 @@ const chatWithGPT = async (req, res) => {
 
     console.log("🔍 Query final:", JSON.stringify(query, null, 2));
 
-    const becasFiltradas = await Beca.find(query)
+    let becasFiltradas = await Beca.find(query)
       .select(
         "nombreBeca paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
       )
       .limit(30);
 
     console.log("🔍 Becas encontradas:", becasFiltradas.length);
+
+    // Si hay datos de usuario, verificar requisitos para cada beca
+    if (userData) {
+      becasFiltradas = becasFiltradas.map((beca) => {
+        const cumple = cumpleRequisitos(userData, beca);
+        return {
+          ...beca.toObject(),
+          cumpleRequisitos: cumple,
+        };
+      });
+    }
 
     // PASO 4: Generar respuesta final con ChatGPT
     console.log("💬 Paso 4: Generando respuesta final...");
