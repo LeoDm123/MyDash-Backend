@@ -64,54 +64,14 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    // Paso 1: pedirle a GPT que extraiga filtros de la pregunta y considere el perfil del usuario
+    // PASO 1: Extraer filtros de la consulta usando ChatGPT
+    console.log("🔍 Paso 1: Extrayendo filtros de la consulta...");
     const filtroGPT = await openai.chat.completions.create({
       model: settings.model,
       messages: [
         {
           role: "system",
-          content: `${extraerFiltrosPrompt}
-          
-          ${
-            userData
-              ? `Perfil del usuario:
-          Datos personales:
-          - Nacionalidad: ${
-            userData.personalData?.nationality || "No especificada"
-          }
-          - Ciudad actual: ${
-            userData.personalData?.currentCity || "No especificada"
-          }
-          - Grupos minoritarios: ${
-            userData.personalData?.minorityGroups?.join(", ") || "Ninguno"
-          }
-          
-          Datos académicos:
-          ${
-            userData.academicData
-              ?.map(
-                (acad) => `
-          - Título: ${acad.degree}
-          - Disciplina: ${acad.discipline}
-          `
-              )
-              .join("\n") || "No hay datos académicos registrados"
-          }
-          
-          Idiomas:
-          ${
-            userData.languages
-              ?.map((lang) => `- ${lang.language}: ${lang.level}`)
-              .join("\n") || "No hay idiomas registrados"
-          }
-          
-          Basándote en esta información, extrae los filtros más relevantes para el usuario.
-          Considera:
-          1. Su nacionalidad para becas específicas por país
-          2. Su nivel académico actual para becas acordes
-          3. Los idiomas que habla para becas que requieran esos idiomas`
-              : ""
-          }`,
+          content: extraerFiltrosPrompt,
         },
         { role: "user", content: message },
       ],
@@ -123,13 +83,64 @@ const chatWithGPT = async (req, res) => {
     try {
       filtros = JSON.parse(filtroGPT.choices[0].message.content);
     } catch (e) {
+      console.log("⚠️ Error al parsear filtros:", e);
       filtros = {};
     }
+    console.log("📋 Filtros extraídos:", filtros);
 
-    // Paso 2: buscar en la base de datos usando los filtros
+    // PASO 2: Extraer información del usuario si está disponible
+    console.log("👤 Paso 2: Procesando información del usuario...");
+    const userFilters = {};
+    if (userData) {
+      // Filtro por nacionalidad
+      if (userData.personalData?.nationality) {
+        userFilters.paisPostulante = userData.personalData.nationality;
+      }
+
+      // Filtro por idiomas
+      if (userData.languages?.length > 0) {
+        const idiomasUsuario = userData.languages.map((lang) => lang.language);
+        userFilters["requisitos.idiomasRequeridos.idioma"] = {
+          $in: idiomasUsuario,
+        };
+      }
+
+      // Filtro por nivel académico
+      if (userData.academicData?.length > 0) {
+        const nivelesAcademicos = userData.academicData.map(
+          (acad) => acad.degree
+        );
+        userFilters.nivelAcademico = { $in: nivelesAcademicos };
+      }
+
+      // Filtro por áreas de interés
+      if (userData.scholarshipProfile?.areasOfInterest?.length > 0) {
+        userFilters.areaEstudio = {
+          $in: userData.scholarshipProfile.areasOfInterest,
+        };
+      }
+
+      // Filtro por países de interés
+      if (userData.scholarshipProfile?.countriesOfInterest?.length > 0) {
+        userFilters.paisDestino = {
+          $in: userData.scholarshipProfile.countriesOfInterest,
+        };
+      }
+
+      // Filtro por tipos de beca de interés
+      if (userData.scholarshipProfile?.scholarshipTypes?.length > 0) {
+        userFilters.tipoBeca = {
+          $in: userData.scholarshipProfile.scholarshipTypes,
+        };
+      }
+    }
+    console.log("📋 Filtros del usuario:", userFilters);
+
+    // PASO 3: Construir query final y buscar becas
+    console.log("🔍 Paso 3: Buscando becas...");
     const query = {};
 
-    // Primero agregamos los filtros extraídos del mensaje
+    // Agregar filtros de la consulta
     for (const [key, value] of Object.entries(filtros)) {
       if (key.includes(".")) {
         const [parent, child] = key.split(".");
@@ -144,64 +155,10 @@ const chatWithGPT = async (req, res) => {
       }
     }
 
-    // Luego agregamos los filtros del usuario si están disponibles
-    if (userData) {
-      // Filtro por nacionalidad
-      if (userData.personalData?.nationality) {
-        if (!query.paisPostulante) {
-          query.paisPostulante = userData.personalData.nationality;
-        }
-      }
-
-      // Filtro por idiomas
-      if (userData.languages?.length > 0) {
-        const idiomasUsuario = userData.languages.map((lang) => lang.language);
-        if (!query.requisitos) {
-          query.requisitos = {};
-        }
-        if (!query.requisitos.idiomasRequeridos) {
-          query.requisitos.idiomasRequeridos = {};
-        }
-        if (!query.requisitos.idiomasRequeridos.idioma) {
-          query.requisitos.idiomasRequeridos.idioma = { $in: idiomasUsuario };
-        }
-      }
-
-      // Filtro por nivel académico
-      if (userData.academicData?.length > 0) {
-        const nivelesAcademicos = userData.academicData.map(
-          (acad) => acad.degree
-        );
-        if (!query.nivelAcademico) {
-          query.nivelAcademico = { $in: nivelesAcademicos };
-        }
-      }
-
-      // Filtro por áreas de interés
-      if (userData.scholarshipProfile?.areasOfInterest?.length > 0) {
-        if (!query.areaEstudio) {
-          query.areaEstudio = {
-            $in: userData.scholarshipProfile.areasOfInterest,
-          };
-        }
-      }
-
-      // Filtro por países de interés
-      if (userData.scholarshipProfile?.countriesOfInterest?.length > 0) {
-        if (!query.paisDestino) {
-          query.paisDestino = {
-            $in: userData.scholarshipProfile.countriesOfInterest,
-          };
-        }
-      }
-
-      // Filtro por tipos de beca de interés
-      if (userData.scholarshipProfile?.scholarshipTypes?.length > 0) {
-        if (!query.tipoBeca) {
-          query.tipoBeca = {
-            $in: userData.scholarshipProfile.scholarshipTypes,
-          };
-        }
+    // Agregar filtros del usuario (solo si no existen en los filtros de la consulta)
+    for (const [key, value] of Object.entries(userFilters)) {
+      if (!query[key]) {
+        query[key] = value;
       }
     }
 
@@ -215,7 +172,8 @@ const chatWithGPT = async (req, res) => {
 
     console.log("🔍 Becas encontradas:", becasFiltradas.length);
 
-    // Paso 3: reenviar la consulta del usuario + las becas encontradas para que GPT genere la respuesta final
+    // PASO 4: Generar respuesta final con ChatGPT
+    console.log("💬 Paso 4: Generando respuesta final...");
     const finalResponse = await openai.chat.completions.create({
       model: settings.model,
       messages: [
@@ -265,7 +223,6 @@ const chatWithGPT = async (req, res) => {
           Estas son las becas encontradas según los filtros extraídos:
           ${JSON.stringify(becasFiltradas, null, 2)}
 
-          
           Responde de manera clara y útil, considerando el perfil del usuario y sus intereses.`,
         },
         {
