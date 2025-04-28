@@ -56,8 +56,7 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    // Obtener configuración activa
-    console.log("🛠️ Buscando configuración activa...");
+    // 1. Obtener configuración activa
     const settings = await ChatSettings.findOne({ isActive: true });
     if (!settings) {
       return res.status(500).json({
@@ -66,15 +65,12 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    // PASO 1: Extraer filtros de la consulta
-    console.log("🔍 Paso 1: Extrayendo filtros de la consulta...");
+    // 2. Extraer filtros desde el mensaje
+    console.log("🔍 Extrayendo filtros de la consulta...");
     const filtroGPT = await openai.chat.completions.create({
       model: settings.model,
       messages: [
-        {
-          role: "system",
-          content: extraerFiltrosPrompt,
-        },
+        { role: "system", content: extraerFiltrosPrompt },
         { role: "user", content: message },
       ],
       temperature: 0,
@@ -84,57 +80,15 @@ const chatWithGPT = async (req, res) => {
     let filtros;
     try {
       filtros = JSON.parse(filtroGPT.choices[0].message.content);
+      console.log("📋 Filtros extraídos:", filtros);
     } catch (e) {
-      console.log("⚠️ Error al parsear filtros:", e);
+      console.error("⚠️ Error al parsear filtros:", e);
       filtros = {};
     }
-    console.log("📋 Filtros extraídos:", filtros);
 
-    // PASO 2: Procesar información del usuario
-    console.log("👤 Paso 2: Procesando información del usuario...");
-    const userFilters = {};
-    if (userData) {
-      if (userData.personalData?.nationality) {
-        userFilters.paisPostulante = userData.personalData.nationality;
-      }
-      if (userData.languages?.length > 0) {
-        const idiomasUsuario = userData.languages.map((lang) => lang.language);
-        userFilters["requisitos.idiomasRequeridos.idioma"] = {
-          $in: idiomasUsuario,
-        };
-      }
-      if (userData.academicData?.length > 0) {
-        const nivelesAcademicos = userData.academicData.map(
-          (acad) => acad.degree
-        );
-        userFilters.nivelAcademico = { $in: nivelesAcademicos };
-      }
-      if (userData.scholarshipProfile?.areasOfInterest?.length > 0) {
-        userFilters.areaEstudio = {
-          $in: userData.scholarshipProfile.areasOfInterest,
-        };
-      }
-      if (userData.scholarshipProfile?.countriesOfInterest?.length > 0) {
-        userFilters.paisDestino = {
-          $in: userData.scholarshipProfile.countriesOfInterest,
-        };
-      }
-      if (userData.scholarshipProfile?.scholarshipTypes?.length > 0) {
-        userFilters.tipoBeca = {
-          $in: userData.scholarshipProfile.scholarshipTypes,
-        };
-      }
-    }
-    console.log("📋 Filtros del usuario:", userFilters);
-
-    // PASO 3: Construir query final
-    console.log("🔨 Paso 3: Construyendo query de búsqueda...");
+    // 3. Armar query SOLO con filtros extraídos
     const query = {};
-
     for (const [key, value] of Object.entries(filtros)) {
-      console.log(
-        `➡️ Agregando filtro de consulta: ${key} = ${JSON.stringify(value)}`
-      );
       if (key.includes(".")) {
         const [parent, child] = key.split(".");
         if (!query[parent]) query[parent] = {};
@@ -145,32 +99,25 @@ const chatWithGPT = async (req, res) => {
         query[key] = value;
       }
     }
+    console.log(
+      "✅ Query basada en la consulta:",
+      JSON.stringify(query, null, 2)
+    );
 
-    for (const [key, value] of Object.entries(userFilters)) {
-      if (!query[key]) {
-        console.log(
-          `➡️ Agregando filtro de usuario: ${key} = ${JSON.stringify(value)}`
-        );
-        query[key] = value;
-      }
-    }
-
-    console.log("✅ Query final construida:", JSON.stringify(query, null, 2));
-
-    // Buscar las becas que cumplen con los filtros
-    console.log("🔎 Buscando becas...");
+    // 4. Buscar becas que cumplen SOLO los filtros de consulta
+    console.log("🔎 Buscando becas que cumplen filtros de la consulta...");
     let becasFiltradas = await Beca.find(query)
       .select(
         "nombreBeca paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
       )
       .limit(30);
 
-    console.log(
-      `🔎 Becas encontradas (sin filtrar requisitos): ${becasFiltradas.length}`
-    );
+    console.log(`🔎 Becas encontradas tras consulta: ${becasFiltradas.length}`);
 
-    // PASO 3.5: Aplicar validación de requisitos
-    console.log("🛠️ Verificando requisitos específicos...");
+    // 5. Ahora, aplicar el filtrado por requisitos de usuario (match)
+    console.log(
+      "🛠️ Analizando match de requisitos con el perfil de usuario..."
+    );
     if (userData) {
       let totalCumplen = 0;
       let totalFaltanDatos = 0;
@@ -204,9 +151,9 @@ const chatWithGPT = async (req, res) => {
           totalNoCumplen++;
           return null;
         })
-        .filter((beca) => beca !== null);
+        .filter((beca) => beca !== null); // Eliminar las que NO cumplen
 
-      console.log(`🏁 Resultado filtrado:
+      console.log(`🏁 Resumen:
       ✅ Cumplen requisitos: ${totalCumplen}
       ⚠️ Faltan datos: ${totalFaltanDatos}
       ❌ No cumplen requisitos: ${totalNoCumplen}`);
@@ -225,28 +172,24 @@ const chatWithGPT = async (req, res) => {
       `🎯 Total final de becas que se enviarán: ${becasFiltradas.length}`
     );
 
-    // PASO 4: Generar respuesta final
-    console.log("💬 Paso 4: Generando respuesta final para el usuario...");
+    // 6. Generar respuesta final usando GPT
+    console.log("💬 Generando respuesta final...");
     const finalResponse = await openai.chat.completions.create({
       model: settings.model,
       messages: [
-        {
-          role: "system",
-          content: settings.systemPrompt,
-        },
+        { role: "system", content: settings.systemPrompt },
         {
           role: "system",
           content: `${
             userData
               ? `Perfil del usuario:
-          Datos personales:
-          - Nacionalidad: ${
+          Nacionalidad: ${
             userData.personalData?.nationality || "No especificada"
           }
-          - Ciudad actual: ${
+          Ciudad actual: ${
             userData.personalData?.currentCity || "No especificada"
           }
-          - Grupos minoritarios: ${
+          Grupos minoritarios: ${
             userData.personalData?.minorityGroups?.join(", ") || "Ninguno"
           }
           
@@ -254,33 +197,27 @@ const chatWithGPT = async (req, res) => {
           ${
             userData.academicData
               ?.map(
-                (acad) => `
-          - Título: ${acad.degree}
-          - Disciplina: ${acad.discipline}`
+                (acad) =>
+                  `- Título: ${acad.degree} - Disciplina: ${acad.discipline}`
               )
               .join("\n") || "No hay datos académicos registrados"
           }
-          
+
           Idiomas:
           ${
             userData.languages
               ?.map((lang) => `- ${lang.language}: ${lang.level}`)
               .join("\n") || "No hay idiomas registrados"
-          }
-          
-          Considera esta información al generar la respuesta.`
+          }`
               : ""
           }
 
-          Estas son las becas encontradas según los filtros extraídos:
+          Becas encontradas:
           ${JSON.stringify(becasFiltradas, null, 2)}
 
-          Responde de manera clara y útil, considerando el perfil del usuario y sus intereses.`,
+          Responde de manera clara y útil, considerando el perfil del usuario.`,
         },
-        {
-          role: "user",
-          content: message,
-        },
+        { role: "user", content: message },
       ],
       temperature: settings.temperature,
       max_tokens: settings.maxTokens,
