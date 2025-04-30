@@ -243,10 +243,10 @@ function cumpleRequisitos(usuario, beca) {
   }
 
   const checks = [
-    cumpleEdadMaxima(usuario, beca),
+    // cumpleEdadMaxima(usuario, beca),
     cumpleNacionalidad(usuario, beca),
-    cumpleNivelAcademico(usuario, beca),
-    cumpleIdiomas(usuario, beca),
+    // cumpleNivelAcademico(usuario, beca),
+    // cumpleIdiomas(usuario, beca),
   ];
 
   const resultadoFinal = checks.every((v) => v === true);
