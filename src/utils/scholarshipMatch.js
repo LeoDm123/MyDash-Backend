@@ -147,6 +147,8 @@ function cumpleNacionalidad(usuario, beca) {
 
   const paisesPermitidos = beca.paisPostulante;
 
+  console.log("paises postulantes", paisesPermitidos);
+
   if (!Array.isArray(paisesPermitidos) || paisesPermitidos.length === 0) {
     console.log("✅ Beca sin restricción de país de postulante.");
     return true; // Si no hay restricción, se permite
@@ -243,10 +245,10 @@ function cumpleRequisitos(usuario, beca) {
   }
 
   const checks = [
-    // cumpleEdadMaxima(usuario, beca),
+    cumpleEdadMaxima(usuario, beca),
     cumpleNacionalidad(usuario, beca),
-    // cumpleNivelAcademico(usuario, beca),
-    // cumpleIdiomas(usuario, beca),
+    cumpleNivelAcademico(usuario, beca),
+    cumpleIdiomas(usuario, beca),
   ];
 
   const resultadoFinal = checks.every((v) => v === true);
