@@ -138,30 +138,42 @@ function cumpleEdadMaxima(usuario, beca) {
 }
 
 function cumpleNacionalidad(usuario, beca) {
-  if (Array.isArray(beca.paisPostulante) && beca.paisPostulante.length > 0) {
-    const nacionalidadesPermitidas = beca.paisPostulante.map((p) =>
-      p.toLowerCase()
-    );
-    const nacionalidadUsuario = usuario.personalData.nationality.toLowerCase();
+  const nacionalidadUsuario = usuario.personalData.nationality?.toLowerCase();
 
-    console.log(
-      `📋 Nacionalidad del usuario: ${nacionalidadUsuario} / Nacionalidades permitidas: ${nacionalidadesPermitidas}`
-    );
-
-    if (
-      !nacionalidadesPermitidas.includes("todos") &&
-      !nacionalidadesPermitidas.includes(nacionalidadUsuario)
-    ) {
-      console.log(
-        `❌ Nacionalidad ${usuario.personalData.nationality} no permitida para esta beca.`
-      );
-      return false;
-    }
-
-    console.log("✅ Nacionalidad permitida.");
+  if (!nacionalidadUsuario) {
+    console.log("⚠️ No se encontró nacionalidad en el perfil del usuario.");
+    return false;
   }
 
-  return true;
+  const paisesPermitidos = beca.paisPostulante;
+
+  if (!Array.isArray(paisesPermitidos) || paisesPermitidos.length === 0) {
+    console.log("✅ Beca sin restricción de país de postulante.");
+    return true; // Si no hay restricción, se permite
+  }
+
+  const normalizados = paisesPermitidos.map((p) => p.toLowerCase());
+
+  if (normalizados.includes("todos")) {
+    console.log(
+      "✅ Nacionalidad permitida (la beca aplica a todos los países)."
+    );
+    return true;
+  }
+
+  if (normalizados.includes(nacionalidadUsuario)) {
+    console.log(
+      `✅ Nacionalidad permitida: ${usuario.personalData.nationality}`
+    );
+    return true;
+  }
+
+  console.log(
+    `❌ Nacionalidad no permitida: ${
+      usuario.personalData.nationality
+    } no está en ${JSON.stringify(paisesPermitidos)}`
+  );
+  return false;
 }
 
 function cumpleNivelAcademico(usuario, beca) {
