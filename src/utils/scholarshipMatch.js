@@ -1,3 +1,4 @@
+// Edad
 function calcularEdad(birthDate) {
   if (!birthDate) {
     console.log("⚠️ No se proporcionó fecha de nacimiento.");
@@ -16,6 +17,7 @@ function calcularEdad(birthDate) {
   return edad;
 }
 
+// Validación general de perfil
 function usuarioTieneInformacionCompleta(usuario, requiereIdioma = false) {
   console.log("🔎 Verificando información completa del usuario...");
 
@@ -60,6 +62,7 @@ function usuarioTieneInformacionCompleta(usuario, requiereIdioma = false) {
   return true;
 }
 
+// Nivel académico máximo completado
 function obtenerNivelAcademicoMaximo(academicData) {
   const niveles = {
     Secundario: 0,
@@ -97,6 +100,7 @@ function obtenerNivelAcademicoMaximo(academicData) {
   return maxDegree;
 }
 
+// Comparación de niveles de idioma
 function cumpleNivelIdioma(nivelUsuario, nivelRequerido) {
   const niveles = ["A1", "A2", "B1", "B2", "C1", "C2"];
   const indiceUsuario = niveles.indexOf(nivelUsuario.toUpperCase());
@@ -116,35 +120,24 @@ function cumpleNivelIdioma(nivelUsuario, nivelRequerido) {
   return cumple;
 }
 
-function cumpleRequisitos(usuario, beca) {
+// Validaciones específicas
+function cumpleEdadMaxima(usuario, beca) {
+  const edadMax = Number(beca.requisitos?.edadMax);
+  const edadUsuario = calcularEdad(usuario.personalData.birthDate);
+
   console.log(
-    `🔍 Evaluando requisitos para la beca: ${beca.nombreBeca || "(sin nombre)"}`
+    `📋 Edad del usuario: ${edadUsuario} / Edad máxima permitida: ${edadMax}`
   );
 
-  const idiomasRequeridos = beca.requisitos?.idiomasRequeridos || [];
-  const requiereIdioma = idiomasRequeridos.length > 0;
-
-  const validacion = usuarioTieneInformacionCompleta(usuario, requiereIdioma);
-  if (validacion !== true) {
-    console.log("⚠️ Resultado validación de usuario: faltan datos.");
-    return "Cargar perfil para determinar si cumplís con los requisitos";
+  if (!isNaN(edadMax) && edadUsuario > edadMax) {
+    console.log("❌ Edad del usuario supera el máximo permitido.");
+    return false;
   }
 
-  // 🧓 Edad
-  if (beca.requisitos && beca.requisitos.edadMax) {
-    const edadMax = Number(beca.requisitos.edadMax);
-    const edadUsuario = calcularEdad(usuario.personalData.birthDate);
-    console.log(
-      `📋 Edad del usuario: ${edadUsuario} / Edad máxima permitida: ${edadMax}`
-    );
+  return true;
+}
 
-    if (!isNaN(edadMax) && edadUsuario > edadMax) {
-      console.log("❌ Edad del usuario supera el máximo permitido.");
-      return false;
-    }
-  }
-
-  // 🌍 Nacionalidad
+function cumpleNacionalidad(usuario, beca) {
   if (Array.isArray(beca.paisPostulante) && beca.paisPostulante.length > 0) {
     const nacionalidadesPermitidas = beca.paisPostulante.map((p) =>
       p.toLowerCase()
@@ -159,67 +152,107 @@ function cumpleRequisitos(usuario, beca) {
         `❌ Nacionalidad ${usuario.personalData.nationality} no permitida para esta beca.`
       );
       return false;
-    } else {
-      console.log("✅ Nacionalidad permitida.");
     }
+
+    console.log("✅ Nacionalidad permitida.");
   }
 
-  // 🎓 Nivel académico
-  if (beca.requisitos?.nivelAcademicoMin) {
-    const nivelUsuario =
-      obtenerNivelAcademicoMaximo(usuario.academicData) || "Secundario";
-
-    const niveles = {
-      Secundario: 0,
-      Grado: 1,
-      Posgrado: 2,
-      Maestría: 3,
-      Doctorado: 4,
-      Posdoctorado: 5,
-    };
-
-    const minRequerido = beca.requisitos.nivelAcademicoMin;
-    console.log(
-      `🎓 Nivel académico del usuario: ${nivelUsuario} / Mínimo requerido: ${minRequerido}`
-    );
-
-    if (niveles[nivelUsuario] < niveles[minRequerido]) {
-      console.log("❌ Nivel académico insuficiente.");
-      return false;
-    }
-  }
-
-  // 🗣️ Idiomas
-  if (beca.requisitos?.idiomasRequeridos) {
-    const cumpleIdiomas = beca.requisitos.idiomasRequeridos.every(
-      (reqIdioma) => {
-        const idiomaCumple = usuario.languages.some((idioma) => {
-          const coincideIdioma =
-            idioma.language.toLowerCase() === reqIdioma.idioma.toLowerCase();
-          const cumpleNivel = cumpleNivelIdioma(
-            idioma.level,
-            reqIdioma.nivelIdioma
-          );
-          return coincideIdioma && cumpleNivel;
-        });
-        return idiomaCumple;
-      }
-    );
-
-    if (!cumpleIdiomas) {
-      console.log("❌ No cumple requisitos de idiomas.");
-      return false;
-    }
-  }
-
-  console.log("✅ Cumple todos los requisitos de la beca.");
   return true;
 }
 
+function cumpleNivelAcademico(usuario, beca) {
+  if (!beca.requisitos?.nivelAcademicoMin) return true;
+
+  const nivelUsuario =
+    obtenerNivelAcademicoMaximo(usuario.academicData) || "Secundario";
+
+  const niveles = {
+    Secundario: 0,
+    Grado: 1,
+    Posgrado: 2,
+    Maestría: 3,
+    Doctorado: 4,
+    Posdoctorado: 5,
+  };
+
+  const minRequerido = beca.requisitos.nivelAcademicoMin;
+  console.log(
+    `🎓 Nivel académico del usuario: ${nivelUsuario} / Mínimo requerido: ${minRequerido}`
+  );
+
+  if (niveles[nivelUsuario] < niveles[minRequerido]) {
+    console.log("❌ Nivel académico insuficiente.");
+    return false;
+  }
+
+  return true;
+}
+
+function cumpleIdiomas(usuario, beca) {
+  if (!beca.requisitos?.idiomasRequeridos) return true;
+
+  const resultado = beca.requisitos.idiomasRequeridos.every((reqIdioma) => {
+    const idiomaCumple = usuario.languages.some((idioma) => {
+      const coincideIdioma =
+        idioma.language.toLowerCase() === reqIdioma.idioma.toLowerCase();
+      const cumpleNivel = cumpleNivelIdioma(
+        idioma.level,
+        reqIdioma.nivelIdioma
+      );
+      return coincideIdioma && cumpleNivel;
+    });
+    return idiomaCumple;
+  });
+
+  if (!resultado) {
+    console.log("❌ No cumple requisitos de idiomas.");
+  }
+
+  return resultado;
+}
+
+// Función principal
+function cumpleRequisitos(usuario, beca) {
+  console.log(
+    `🔍 Evaluando requisitos para la beca: ${beca.nombreBeca || "(sin nombre)"}`
+  );
+
+  const idiomasRequeridos = beca.requisitos?.idiomasRequeridos || [];
+  const requiereIdioma = idiomasRequeridos.length > 0;
+
+  const validacion = usuarioTieneInformacionCompleta(usuario, requiereIdioma);
+  if (validacion !== true) {
+    console.log("⚠️ Resultado validación de usuario: faltan datos.");
+    return "Cargar perfil para determinar si cumplís con los requisitos";
+  }
+
+  const checks = [
+    cumpleEdadMaxima(usuario, beca),
+    cumpleNacionalidad(usuario, beca),
+    cumpleNivelAcademico(usuario, beca),
+    cumpleIdiomas(usuario, beca),
+  ];
+
+  const resultadoFinal = checks.every((v) => v === true);
+
+  if (resultadoFinal) {
+    console.log("✅ Cumple todos los requisitos de la beca.");
+    return true;
+  } else {
+    console.log("❌ No cumple todos los requisitos de la beca.");
+    return false;
+  }
+}
+
+// Exportación
 module.exports = {
   calcularEdad,
   usuarioTieneInformacionCompleta,
   obtenerNivelAcademicoMaximo,
   cumpleNivelIdioma,
+  cumpleEdadMaxima,
+  cumpleNacionalidad,
+  cumpleNivelAcademico,
+  cumpleIdiomas,
   cumpleRequisitos,
 };
