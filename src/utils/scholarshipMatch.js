@@ -144,6 +144,10 @@ function cumpleNacionalidad(usuario, beca) {
     );
     const nacionalidadUsuario = usuario.personalData.nationality.toLowerCase();
 
+    console.log(
+      `📋 Nacionalidad del usuario: ${nacionalidadUsuario} / Nacionalidades permitidas: ${nacionalidadesPermitidas}`
+    );
+
     if (
       !nacionalidadesPermitidas.includes("todos") &&
       !nacionalidadesPermitidas.includes(nacionalidadUsuario)
