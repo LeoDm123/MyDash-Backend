@@ -108,7 +108,7 @@ const chatWithGPT = async (req, res) => {
     console.log("🔎 Buscando becas que cumplen filtros de la consulta...");
     let becasFiltradas = await Beca.find(query)
       .select(
-        "nombreBeca paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
+        "nombreBeca paisDestino regionDestino nivelAcademico paisPostulante tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
       )
       .limit(30);
 
