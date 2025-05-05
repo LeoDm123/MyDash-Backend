@@ -168,8 +168,7 @@ const chatWithGPT = async (req, res) => {
         .select(
           "nombreBeca paisPostulante paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug fechaFinAplicacion"
         )
-        .limit(30)
-        .lean();
+        .limit(30);
 
       console.log(
         `📊 Becas encontradas antes de filtrar por perfil: ${becasFiltradas.length}`
