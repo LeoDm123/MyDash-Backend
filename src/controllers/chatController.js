@@ -72,18 +72,42 @@ Respondé SOLO con la palabra "true" o "false" (en minúsculas), sin ningún otr
 };
 
 const construirQueryDesdeFiltros = (filtros) => {
+  console.log("\n🔍 Construyendo query desde filtros...");
+  console.log("📋 Filtros recibidos:", JSON.stringify(filtros, null, 2));
+
   const query = {};
+
   for (const [key, value] of Object.entries(filtros)) {
+    if (!value) continue; // Ignorar valores nulos o vacíos
+
     if (key.includes(".")) {
+      // Manejar campos anidados (ej: cobertura.matricula)
       const [parent, child] = key.split(".");
       if (!query[parent]) query[parent] = {};
-      query[parent][child] = value;
+
+      // Manejar casos especiales para cobertura
+      if (parent === "cobertura") {
+        query[parent][child] = value === "true" || value === true;
+      } else {
+        query[parent][child] = value;
+      }
     } else if (Array.isArray(value)) {
+      // Manejar arrays (ej: idiomas)
       query[key] = { $in: value };
+    } else if (typeof value === "string" && value.includes(",")) {
+      // Manejar strings con múltiples valores separados por coma
+      query[key] = { $in: value.split(",").map((v) => v.trim()) };
     } else {
+      // Manejar valores simples
       query[key] = value;
     }
   }
+
+  // Agregar filtro de disponibilidad
+  const hoy = new Date();
+  query.fechaFinAplicacion = { $gte: hoy };
+
+  console.log("✅ Query construida:", JSON.stringify(query, null, 2));
   return query;
 };
 
@@ -138,12 +162,8 @@ const chatWithGPT = async (req, res) => {
       }
 
       const query = construirQueryDesdeFiltros(filtros);
-      console.log("🔍 Query construida:", JSON.stringify(query, null, 2));
 
-      // Agregar filtro de disponibilidad
-      const hoy = new Date();
-      query.fechaFinAplicacion = { $gte: hoy };
-
+      console.log("\n🔍 Buscando becas con la query...");
       becasFiltradas = await Beca.find(query)
         .select(
           "nombreBeca paisPostulante paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug fechaFinAplicacion"
@@ -152,7 +172,18 @@ const chatWithGPT = async (req, res) => {
         .lean();
 
       console.log(
-        `📊 Becas encontradas antes de filtrar: ${becasFiltradas.length}`
+        `📊 Becas encontradas antes de filtrar por perfil: ${becasFiltradas.length}`
+      );
+      console.log(
+        "📋 Becas encontradas:",
+        JSON.stringify(
+          becasFiltradas.map((b) => ({
+            nombre: b.nombreBeca,
+            fechaFin: b.fechaFinAplicacion,
+          })),
+          null,
+          2
+        )
       );
 
       if (userData) {
