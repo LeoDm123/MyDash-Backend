@@ -77,7 +77,12 @@ const construirQueryDesdeFiltros = (filtros) => {
 const chatWithGPT = async (req, res) => {
   try {
     const { message, userData, history = [] } = req.body;
-    console.log("\ud83d\udcac Nuevo mensaje recibido:", message);
+    console.log("\n📝 ====== NUEVA CONVERSACIÓN ======");
+    console.log("📩 Mensaje recibido:", message);
+    console.log("👤 Estado del usuario:", userData ? "Logeado" : "No logeado");
+    if (userData) {
+      console.log("📋 Perfil del usuario:", JSON.stringify(userData, null, 2));
+    }
 
     if (!message) {
       return res
@@ -96,8 +101,11 @@ const chatWithGPT = async (req, res) => {
     let becasFiltradas = [];
     let respuestaConBecas = "";
 
-    if (await esConsultaDeBecas(message)) {
-      console.log("\u2728 Es una consulta de becas, extrayendo filtros...");
+    const esConsulta = await esConsultaDeBecas(message);
+    console.log("🔍 ¿Es consulta de becas?:", esConsulta);
+
+    if (esConsulta) {
+      console.log("\n🔎 Extrayendo filtros de la consulta...");
       const filtroGPT = await openai.chat.completions.create({
         model: settings.model,
         messages: [
@@ -111,12 +119,14 @@ const chatWithGPT = async (req, res) => {
       let filtros = {};
       try {
         filtros = JSON.parse(filtroGPT.choices[0].message.content);
-        console.log("\ud83d\udccb Filtros extraídos:", filtros);
+        console.log("✅ Filtros extraídos:", JSON.stringify(filtros, null, 2));
       } catch (e) {
-        console.error("\u26a0\ufe0f Error al parsear filtros:", e);
+        console.error("❌ Error al parsear filtros:", e);
       }
 
       const query = construirQueryDesdeFiltros(filtros);
+      console.log("🔍 Query construida:", JSON.stringify(query, null, 2));
+
       becasFiltradas = await Beca.find(query)
         .select(
           "nombreBeca paisPostulante paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
@@ -124,10 +134,16 @@ const chatWithGPT = async (req, res) => {
         .limit(30)
         .lean();
 
+      console.log(
+        `📊 Becas encontradas antes de filtrar: ${becasFiltradas.length}`
+      );
+
       if (userData) {
+        console.log("\n👤 Aplicando filtros según perfil del usuario...");
         becasFiltradas = becasFiltradas
           .map((beca) => {
             const cumple = cumpleRequisitos(userData, beca);
+            console.log(`📋 Beca "${beca.nombreBeca}": ${cumple}`);
             return {
               ...beca,
               cumpleRequisitos:
@@ -139,6 +155,9 @@ const chatWithGPT = async (req, res) => {
             };
           })
           .filter((b) => b.cumpleRequisitos !== null);
+        console.log(
+          `📊 Becas después de filtrar por perfil: ${becasFiltradas.length}`
+        );
       }
 
       respuestaConBecas = `\nBecas encontradas:\n${JSON.stringify(
@@ -154,8 +173,8 @@ const chatWithGPT = async (req, res) => {
       { role: "user", content: message },
     ];
 
-    // Agregar información del perfil del usuario al contexto si está disponible
     if (userData) {
+      console.log("\n📋 Agregando contexto del perfil del usuario...");
       const perfilContext = `
 Información del perfil del usuario:
 - País: ${userData.pais || "No especificado"}
@@ -171,14 +190,18 @@ Información del perfil del usuario:
 - Edad: ${userData.edad || "No especificada"}
 - Tiene carta de recomendación: ${userData.cartaRecomendacion ? "Sí" : "No"}
 `;
-
+      console.log("📝 Contexto del perfil:", perfilContext);
       fullMessages.push({ role: "system", content: perfilContext });
     }
 
     if (respuestaConBecas) {
+      console.log(
+        "\n📊 Agregando información de becas encontradas al contexto..."
+      );
       fullMessages.push({ role: "system", content: respuestaConBecas });
     }
 
+    console.log("\n🤖 Generando respuesta con GPT...");
     const finalResponse = await openai.chat.completions.create({
       model: settings.model,
       messages: fullMessages,
@@ -187,6 +210,8 @@ Información del perfil del usuario:
     });
 
     const assistantReply = finalResponse.choices[0].message.content;
+    console.log("💬 Respuesta generada:", assistantReply);
+    console.log("✅ ====== FIN DE LA CONVERSACIÓN ======\n");
 
     res.status(200).json({
       success: true,
@@ -195,7 +220,7 @@ Información del perfil del usuario:
       becas: becasFiltradas,
     });
   } catch (error) {
-    console.error("\u274c Error en chatWithGPT:", error);
+    console.error("\n❌ Error en chatWithGPT:", error);
     res.status(500).json({
       success: false,
       message: "Error al procesar tu solicitud",
