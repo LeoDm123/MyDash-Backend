@@ -140,9 +140,13 @@ const chatWithGPT = async (req, res) => {
       const query = construirQueryDesdeFiltros(filtros);
       console.log("🔍 Query construida:", JSON.stringify(query, null, 2));
 
+      // Agregar filtro de disponibilidad
+      const hoy = new Date();
+      query.fechaFinAplicacion = { $gte: hoy };
+
       becasFiltradas = await Beca.find(query)
         .select(
-          "nombreBeca paisPostulante paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
+          "nombreBeca paisPostulante paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug fechaFinAplicacion"
         )
         .limit(30)
         .lean();
