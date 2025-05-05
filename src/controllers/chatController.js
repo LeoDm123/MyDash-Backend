@@ -41,8 +41,18 @@ Si no hay filtros, devolvé: {}
 const esConsultaDeBecas = async (mensaje) => {
   const systemPrompt = `
 Tu tarea es identificar si un mensaje del usuario está relacionado con la búsqueda de becas.
-Respondé solo con "true" si el mensaje tiene la intención de buscar becas, o "false" si no la tiene.
+Considerá que es una consulta de becas si:
+1. El usuario pregunta sobre becas, programas de estudio o financiamiento educativo
+2. El usuario busca oportunidades de estudio en el extranjero
+3. El usuario menciona términos relacionados con becas, estudios, universidades o programas académicos
+4. El usuario pregunta sobre requisitos para estudiar en el extranjero
+5. El usuario busca información sobre programas de intercambio o estudios internacionales
+
+Respondé SOLO con la palabra "true" o "false" (en minúsculas), sin ningún otro texto o explicación.
 `;
+
+  console.log("\n🔍 Analizando si es consulta de becas...");
+  console.log("📝 Mensaje a analizar:", mensaje);
 
   const response = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
@@ -54,8 +64,11 @@ Respondé solo con "true" si el mensaje tiene la intención de buscar becas, o "
     max_tokens: 10,
   });
 
-  const content = response.choices[0].message.content.trim();
-  return content.toLowerCase().includes("true");
+  const content = response.choices[0].message.content.trim().toLowerCase();
+  console.log("🤖 Respuesta de GPT:", content);
+  console.log("✅ Es consulta de becas:", content === "true");
+
+  return content === "true";
 };
 
 const construirQueryDesdeFiltros = (filtros) => {
