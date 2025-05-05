@@ -154,6 +154,27 @@ const chatWithGPT = async (req, res) => {
       { role: "user", content: message },
     ];
 
+    // Agregar información del perfil del usuario al contexto si está disponible
+    if (userData) {
+      const perfilContext = `
+Información del perfil del usuario:
+- País: ${userData.pais || "No especificado"}
+- Nivel académico: ${userData.nivelAcademico || "No especificado"}
+- Área de estudio: ${userData.areaEstudio || "No especificado"}
+- Idiomas: ${
+        userData.idiomas
+          ? userData.idiomas
+              .map((i) => `${i.idioma} (${i.nivelIdioma})`)
+              .join(", ")
+          : "No especificados"
+      }
+- Edad: ${userData.edad || "No especificada"}
+- Tiene carta de recomendación: ${userData.cartaRecomendacion ? "Sí" : "No"}
+`;
+
+      fullMessages.push({ role: "system", content: perfilContext });
+    }
+
     if (respuestaConBecas) {
       fullMessages.push({ role: "system", content: respuestaConBecas });
     }
