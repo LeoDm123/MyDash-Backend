@@ -175,21 +175,61 @@ const chatWithGPT = async (req, res) => {
 
     if (userData) {
       console.log("\n📋 Agregando contexto del perfil del usuario...");
+
+      // Obtener el nivel académico más alto
+      const nivelAcademico =
+        userData.academicData?.length > 0
+          ? userData.academicData.reduce(
+              (max, curr) => (curr.degree === "Maestría" ? curr : max),
+              userData.academicData[0]
+            ).degree
+          : "No especificado";
+
+      // Obtener el área de estudio más reciente
+      const areaEstudio =
+        userData.academicData?.length > 0
+          ? userData.academicData[userData.academicData.length - 1].discipline
+          : "No especificado";
+
+      // Calcular edad a partir de la fecha de nacimiento
+      const edad = userData.personalData?.birthDate
+        ? Math.floor(
+            (new Date() - new Date(userData.personalData.birthDate)) /
+              (1000 * 60 * 60 * 24 * 365.25)
+          )
+        : "No especificada";
+
       const perfilContext = `
 Información del perfil del usuario:
-- País: ${userData.pais || "No especificado"}
-- Nivel académico: ${userData.nivelAcademico || "No especificado"}
-- Área de estudio: ${userData.areaEstudio || "No especificado"}
-- Idiomas: ${
-        userData.idiomas
-          ? userData.idiomas
-              .map((i) => `${i.idioma} (${i.nivelIdioma})`)
-              .join(", ")
-          : "No especificados"
+- Nombre: ${userData.personalData?.firstName || "No especificado"} ${
+        userData.personalData?.lastName || ""
       }
-- Edad: ${userData.edad || "No especificada"}
-- Tiene carta de recomendación: ${userData.cartaRecomendacion ? "Sí" : "No"}
+- Nacionalidad: ${userData.personalData?.nationality || "No especificada"}
+- Nacionalidades adicionales: ${
+        userData.personalData?.additionalCitizenship?.join(", ") ||
+        "No especificadas"
+      }
+- Ciudad actual: ${userData.personalData?.currentCity || "No especificada"}
+- Nivel académico más alto: ${nivelAcademico}
+- Área de estudio más reciente: ${areaEstudio}
+- Idiomas: ${
+        userData.languages
+          ?.map((l) => `${l.language} (${l.level})`)
+          .join(", ") || "No especificados"
+      }
+- Edad: ${edad}
+- Género: ${
+        userData.personalData?.gender === "M"
+          ? "Masculino"
+          : userData.personalData?.gender === "F"
+          ? "Femenino"
+          : "No especificado"
+      }
+- Grupos minoritarios: ${
+        userData.personalData?.minorityGroups?.join(", ") || "No especificados"
+      }
 `;
+
       console.log("📝 Contexto del perfil:", perfilContext);
       fullMessages.push({ role: "system", content: perfilContext });
     }
