@@ -5,9 +5,7 @@ const ChatSettings = require("../models/chatSettings-model");
 const Usuario = require("../models/user-model");
 const { cumpleRequisitos } = require("../utils/scholarshipMatch");
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const extraerFiltrosPrompt = `
 Tu tarea es extraer filtros de búsqueda de una consulta en lenguaje natural sobre becas.
@@ -40,14 +38,46 @@ Solo devolvé un JSON plano con esos filtros, por ejemplo:
 Si no hay filtros, devolvé: {}
 `;
 
+const esConsultaDeBecas = async (mensaje) => {
+  const systemPrompt = `
+Tu tarea es identificar si un mensaje del usuario está relacionado con la búsqueda de becas.
+Respondé solo con "true" si el mensaje tiene la intención de buscar becas, o "false" si no la tiene.
+`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: mensaje },
+    ],
+    temperature: 0,
+    max_tokens: 10,
+  });
+
+  const content = response.choices[0].message.content.trim();
+  return content.toLowerCase().includes("true");
+};
+
+const construirQueryDesdeFiltros = (filtros) => {
+  const query = {};
+  for (const [key, value] of Object.entries(filtros)) {
+    if (key.includes(".")) {
+      const [parent, child] = key.split(".");
+      if (!query[parent]) query[parent] = {};
+      query[parent][child] = value;
+    } else if (Array.isArray(value)) {
+      query[key] = { $in: value };
+    } else {
+      query[key] = value;
+    }
+  }
+  return query;
+};
+
 const chatWithGPT = async (req, res) => {
   try {
     const { message, userData, history = [] } = req.body;
     console.log("\ud83d\udcac Nuevo mensaje recibido:", message);
-    console.log(
-      "\ud83d\udc64 Datos del usuario:",
-      userData ? "Proporcionados" : "No proporcionados"
-    );
 
     if (!message) {
       return res
@@ -63,143 +93,70 @@ const chatWithGPT = async (req, res) => {
       });
     }
 
-    console.log("\ud83d\udd0d Extrayendo filtros de la consulta...");
-    const filtroGPT = await openai.chat.completions.create({
-      model: settings.model,
-      messages: [
-        { role: "system", content: extraerFiltrosPrompt },
-        { role: "user", content: message },
-      ],
-      temperature: 0,
-      max_tokens: 300,
-    });
+    let becasFiltradas = [];
+    let respuestaConBecas = "";
 
-    let filtros;
-    try {
-      filtros = JSON.parse(filtroGPT.choices[0].message.content);
-      console.log("\ud83d\udccb Filtros extraídos:", filtros);
-    } catch (e) {
-      console.error("\u26a0\ufe0f Error al parsear filtros:", e);
-      filtros = {};
-    }
+    if (await esConsultaDeBecas(message)) {
+      console.log("\u2728 Es una consulta de becas, extrayendo filtros...");
+      const filtroGPT = await openai.chat.completions.create({
+        model: settings.model,
+        messages: [
+          { role: "system", content: extraerFiltrosPrompt },
+          { role: "user", content: message },
+        ],
+        temperature: 0,
+        max_tokens: 300,
+      });
 
-    const query = {};
-    for (const [key, value] of Object.entries(filtros)) {
-      if (key.includes(".")) {
-        const [parent, child] = key.split(".");
-        if (!query[parent]) query[parent] = {};
-        query[parent][child] = value;
-      } else if (Array.isArray(value)) {
-        query[key] = { $in: value };
-      } else {
-        query[key] = value;
+      let filtros = {};
+      try {
+        filtros = JSON.parse(filtroGPT.choices[0].message.content);
+        console.log("\ud83d\udccb Filtros extraídos:", filtros);
+      } catch (e) {
+        console.error("\u26a0\ufe0f Error al parsear filtros:", e);
       }
-    }
-    console.log(
-      "\u2705 Query basada en la consulta:",
-      JSON.stringify(query, null, 2)
-    );
 
-    console.log(
-      "\ud83d\udd0e Buscando becas que cumplen filtros de la consulta..."
-    );
-    let becasFiltradas = await Beca.find(query)
-      .select(
-        "nombreBeca paisPostulante paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
-      )
-      .limit(30);
+      const query = construirQueryDesdeFiltros(filtros);
+      becasFiltradas = await Beca.find(query)
+        .select(
+          "nombreBeca paisPostulante paisDestino regionDestino nivelAcademico tipoBeca areaEstudio cobertura requisitos informacionAdicional slug"
+        )
+        .limit(30)
+        .lean();
 
-    console.log(
-      `\ud83d\udd0e Becas encontradas tras consulta: ${becasFiltradas.length}`
-    );
-
-    if (userData) {
-      becasFiltradas = becasFiltradas
-        .map((beca) => {
-          const cumple = cumpleRequisitos(userData, beca);
-          const nombreBeca = beca.nombreBeca || "(sin nombre)";
-
-          if (cumple === "Faltan Datos") {
-            console.log(
-              `\u26a0\ufe0f Faltan datos para evaluar: ${nombreBeca}`
-            );
+      if (userData) {
+        becasFiltradas = becasFiltradas
+          .map((beca) => {
+            const cumple = cumpleRequisitos(userData, beca);
             return {
-              ...beca.toObject(),
+              ...beca,
               cumpleRequisitos:
-                "Cargar perfil para determinar si cumplís con los requisitos",
+                cumple === true
+                  ? "Cumple con los requisitos"
+                  : cumple === "Faltan Datos"
+                  ? "Cargar perfil para determinar si cumplís con los requisitos"
+                  : null,
             };
-          }
+          })
+          .filter((b) => b.cumpleRequisitos !== null);
+      }
 
-          if (cumple === true) {
-            console.log(`\u2705 Cumple requisitos: ${nombreBeca}`);
-            return {
-              ...beca.toObject(),
-              cumpleRequisitos: "Cumple con los requisitos",
-            };
-          }
-
-          console.log(`\u274c No cumple requisitos: ${nombreBeca}`);
-          return null;
-        })
-        .filter((beca) => beca !== null);
-    } else {
-      console.log(
-        "\ud83e\uddd1 No hay datos del usuario ➔ No se realiza verificación de requisitos."
-      );
-      becasFiltradas = becasFiltradas.map((beca) => ({
-        ...beca.toObject(),
-        cumpleRequisitos:
-          "Cargar perfil para determinar si cumplís con los requisitos",
-      }));
+      respuestaConBecas = `\nBecas encontradas:\n${JSON.stringify(
+        becasFiltradas,
+        null,
+        2
+      )}`;
     }
 
-    console.log(
-      `\ud83c\udfaf Total final de becas que se enviarán: ${becasFiltradas.length}`
-    );
-
-    console.log("\ud83d\udcac Generando respuesta final...");
     const fullMessages = [
       { role: "system", content: settings.systemPrompt },
-      {
-        role: "system",
-        content: `${
-          userData
-            ? `Perfil del usuario:
-        Nacionalidad: ${userData.personalData?.nationality || "No especificada"}
-        Ciudad actual: ${
-          userData.personalData?.currentCity || "No especificada"
-        }
-        Grupos minoritarios: ${
-          userData.personalData?.minorityGroups?.join(", ") || "Ninguno"
-        }
-
-        Datos académicos:
-        ${
-          userData.academicData
-            ?.map(
-              (acad) =>
-                `- Título: ${acad.degree} - Disciplina: ${acad.discipline}`
-            )
-            .join("\n") || "No hay datos académicos registrados"
-        }
-
-        Idiomas:
-        ${
-          userData.languages
-            ?.map((lang) => `- ${lang.language}: ${lang.level}`)
-            .join("\n") || "No hay idiomas registrados"
-        }`
-            : ""
-        }
-
-        Becas encontradas:
-        ${JSON.stringify(becasFiltradas, null, 2)}
-
-        Responde de manera clara y útil, considerando el perfil del usuario.`,
-      },
       ...history,
       { role: "user", content: message },
     ];
+
+    if (respuestaConBecas) {
+      fullMessages.push({ role: "system", content: respuestaConBecas });
+    }
 
     const finalResponse = await openai.chat.completions.create({
       model: settings.model,
@@ -214,6 +171,7 @@ const chatWithGPT = async (req, res) => {
       success: true,
       response: assistantReply,
       newMessage: { role: "assistant", content: assistantReply },
+      becas: becasFiltradas,
     });
   } catch (error) {
     console.error("\u274c Error en chatWithGPT:", error);
