@@ -180,6 +180,16 @@ const chatWithGPT = async (req, res) => {
         console.log(
           `📊 Becas después de filtrar por perfil: ${becasFiltradas.length}`
         );
+      } else {
+        console.log(
+          "\n⚠️ No hay datos del usuario. Mostrando becas sin filtrar."
+        );
+        if (becasFiltradas.length > 5) {
+          becasFiltradas = becasFiltradas.slice(0, 5);
+          console.log(
+            "📉 Mostrando solo 5 becas por falta de perfil del usuario."
+          );
+        }
       }
 
       respuestaConBecas = `\nBecas encontradas:\n${JSON.stringify(
