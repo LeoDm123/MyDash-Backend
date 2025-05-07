@@ -14,7 +14,7 @@ Debés devolver un objeto JSON con las claves relevantes según la base de datos
 Campos posibles:
 - tipoBeca
 - paisDestino
-- regionDestinos
+- regionDestino
 - paisPostulante
 - areaEstudio
 - nivelAcademico
