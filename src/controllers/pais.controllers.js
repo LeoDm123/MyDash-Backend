@@ -39,12 +39,14 @@ const getPaises = async (req, res) => {
   }
 };
 
-// Obtener país por ID
-const getPaisById = async (req, res) => {
+// Obtener país por nombre
+const getPaisByNombre = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { nombre } = req.params;
 
-    const pais = await Pais.findById(id);
+    const pais = await Pais.findOne({
+      nombre: { $regex: new RegExp(nombre, "i") },
+    });
 
     if (!pais) {
       return res.status(404).json({ msg: "País no encontrado" });
@@ -58,7 +60,7 @@ const getPaisById = async (req, res) => {
 
     res.status(200).json(paisObj);
   } catch (error) {
-    console.error("Error al obtener país por ID:", error);
+    console.error("Error al obtener país por nombre:", error);
     res.status(500).json({
       msg: "Hubo un problema al obtener el país",
     });
@@ -116,7 +118,7 @@ const deletePais = async (req, res) => {
 module.exports = {
   crearPais,
   getPaises,
-  getPaisById,
+  getPaisByNombre,
   updatePais,
   deletePais,
 };
