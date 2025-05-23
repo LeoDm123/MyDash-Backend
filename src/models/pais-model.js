@@ -11,12 +11,9 @@ const paisSchema = new Schema({
   costo_vida_mensual_usd: {
     moneda: { type: String },
     tipo_cambio_usd: { type: String },
-    residencia_universitaria_usd: {
-      min: { type: Number },
-      max: { type: Number },
-    },
-    supermercado_mensual_usd: { type: Number },
-    transporte_publico_usd: { type: Number },
+    residencia_universitaria_usd: { type: String },
+    supermercado_mensual_usd: { type: String },
+    transporte_publico_usd: { type: String },
     seguro_medico_obligatorio: { type: String },
   },
   sistema_educacion: {
@@ -26,7 +23,7 @@ const paisSchema = new Schema({
   },
   universidades_mejor_rankeadas: [{ type: String }],
   comunidad_estudiantil_internacional: {
-    porcentaje_estudiantes_internacionales: { type: Number },
+    porcentaje_estudiantes_internacionales: { type: String },
   },
   visa_y_requisitos_migratorios: {
     tipo_visa_estudiante: { type: String },
