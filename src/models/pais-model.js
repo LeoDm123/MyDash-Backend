@@ -21,7 +21,28 @@ const paisSchema = new Schema({
     idiomas_instruccion: [{ type: String }],
     calendario_academico: { type: String },
   },
-  universidades_mejor_rankeadas: [{ type: String }],
+  universidades_mejor_rankeadas: [
+    {
+      nombreRanking: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      universidades: [
+        {
+          nombre: {
+            type: String,
+            required: true,
+            trim: true,
+          },
+          posicion: {
+            type: Number,
+            required: true,
+          },
+        },
+      ],
+    },
+  ],
   comunidad_estudiantil_internacional: {
     porcentaje_estudiantes_internacionales: { type: String },
   },
