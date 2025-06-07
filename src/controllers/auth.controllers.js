@@ -33,7 +33,7 @@ const createUser = async (req, res) => {
 
     await user.save();
 
-    await sendMail(email, verificationToken, personalData.firstName);
+    await sendMail(email, verificationToken, firstName);
 
     res.status(201).json({
       msg: "Usuario registrado. Verifica tu email antes de iniciar sesión.",
