@@ -44,6 +44,14 @@ const getPaisByNombre = async (req, res) => {
   try {
     const { nombre } = req.params;
 
+    if (
+      typeof nombre !== "string" ||
+      nombre.trim().length < 2 ||
+      nombre.trim().length > 100
+    ) {
+      return res.status(400).json({ msg: "Nombre de país inválido" });
+    }
+
     const pais = await Pais.findOne({
       nombre: { $regex: new RegExp(nombre, "i") },
     });

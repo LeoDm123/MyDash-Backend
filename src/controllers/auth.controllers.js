@@ -73,8 +73,8 @@ const verifyEmail = async (req, res) => {
   try {
     const { token } = req.query;
 
-    if (!token) {
-      return res.status(400).json({ msg: "Token no proporcionado" });
+    if (typeof token !== "string" || !/^[a-f0-9]{32,}$/.test(token)) {
+      return res.status(400).json({ msg: "Token inválido" });
     }
 
     const user = await Users.findOne({ verificationToken: token });
@@ -333,6 +333,10 @@ const sendVerificationEmail = async (req, res) => {
 
 const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
+
+  if (typeof token !== "string" || !/^[a-f0-9]{32,}$/.test(token)) {
+    return res.status(400).json({ msg: "Token inválido" });
+  }
 
   try {
     const user = await Users.findOne({
