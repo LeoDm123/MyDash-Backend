@@ -5,8 +5,31 @@ const crypto = require("crypto");
 const sendMail = require("../services/emailService");
 const generarSitemap = require("../services/generarSitemap");
 
+const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
 const createUser = async (req, res) => {
-  const { email, password, firstName, lastName, ...rest } = req.body;
+  let { email, password, firstName, lastName, ...rest } = req.body;
+
+  if (typeof email !== "string" || !emailRegex.test(email)) {
+    return res.status(400).json({ msg: "Email inválido" });
+  }
+  if (typeof password !== "string" || password.length < 8) {
+    return res
+      .status(400)
+      .json({ msg: "Contraseña inválida. Debe tener al menos 8 caracteres." });
+  }
+  if (typeof firstName !== "string" || firstName.trim().length < 2) {
+    return res
+      .status(400)
+      .json({ msg: "Nombre inválido. Debe tener al menos 2 caracteres." });
+  }
+  if (typeof lastName !== "string" || lastName.trim().length < 2) {
+    return res
+      .status(400)
+      .json({ msg: "Apellido inválido. Debe tener al menos 2 caracteres." });
+  }
+  firstName = firstName.trim();
+  lastName = lastName.trim();
 
   try {
     let user = await Users.findOne({ email });
@@ -89,6 +112,10 @@ const userLogin = async (req, res) => {
   try {
     const { userEmail, userPassword } = req.body;
 
+    if (typeof userEmail !== "string" || !emailRegex.test(userEmail)) {
+      return res.status(400).json({ msg: "Email inválido" });
+    }
+
     let user = await Users.findOne({ email: userEmail });
 
     if (!user) {
@@ -135,6 +162,10 @@ const userLogin = async (req, res) => {
 const getUserByEmail = async (req, res) => {
   try {
     const { userEmail } = req.query;
+
+    if (typeof userEmail !== "string" || !emailRegex.test(userEmail)) {
+      return res.status(400).json({ message: "Email inválido" });
+    }
 
     const user = await Users.findOne({ email: userEmail });
 
@@ -183,6 +214,10 @@ const updateUser = async (req, res) => {
   try {
     const { userEmail, userPassword, ...rest } = req.body;
 
+    if (typeof userEmail !== "string" || !emailRegex.test(userEmail)) {
+      return res.status(400).json({ message: "Email inválido" });
+    }
+
     let updateData = { ...rest };
 
     if (userPassword) {
@@ -229,6 +264,10 @@ const deleteUser = async (req, res) => {
 const sendPasswordResetEmail = async (req, res) => {
   const { email } = req.body;
 
+  if (typeof email !== "string" || !emailRegex.test(email)) {
+    return res.status(400).json({ msg: "Email inválido" });
+  }
+
   try {
     const user = await Users.findOne({ email });
 
@@ -256,6 +295,10 @@ const sendPasswordResetEmail = async (req, res) => {
 
 const sendVerificationEmail = async (req, res) => {
   const { email } = req.body;
+
+  if (typeof email !== "string" || !emailRegex.test(email)) {
+    return res.status(400).json({ msg: "Email inválido" });
+  }
 
   try {
     const user = await Users.findOne({ email });

@@ -3,13 +3,29 @@ const { dbConnection } = require("./src/database/config");
 const cors = require("cors");
 const path = require("path");
 require("dotenv").config();
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: "https://todobeca.com",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+  })
+);
 
 app.use(express.static(path.join(__dirname, "public")));
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+app.use(limiter);
+
+app.use(helmet());
 
 dbConnection();
 
