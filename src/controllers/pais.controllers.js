@@ -39,6 +39,11 @@ const getPaises = async (req, res) => {
   }
 };
 
+// Escapa caracteres especiales de regex para evitar inyección
+function escapeRegex(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 // Obtener país por nombre
 const getPaisByNombre = async (req, res) => {
   try {
@@ -52,8 +57,9 @@ const getPaisByNombre = async (req, res) => {
       return res.status(400).json({ msg: "Nombre de país inválido" });
     }
 
+    const escapedNombre = escapeRegex(nombre.trim());
     const pais = await Pais.findOne({
-      nombre: { $regex: new RegExp(nombre, "i") },
+      nombre: { $regex: new RegExp(`^${escapedNombre}$`, "i") },
     });
 
     if (!pais) {
