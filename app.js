@@ -8,14 +8,27 @@ const rateLimit = require("express-rate-limit");
 
 const app = express();
 
-app.use(express.json());
+const allowedOrigins = [
+  "https://todobeca.com",
+  "https://todobeca-admin.vercel.app",
+  "http://localhost:4040",
+];
+
 app.use(
   cors({
-    origin: "https://todobeca.com",
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
+
+app.use(express.json());
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -34,6 +47,7 @@ app.use("/beca", require("./src/routes/beca"));
 app.use("/pais", require("./src/routes/pais"));
 app.use("/parametros", require("./src/routes/parametros"));
 app.use("/chat", require("./src/routes/chat"));
+
 const {
   generarSitemapController,
 } = require("./src/controllers/auth.controllers");
