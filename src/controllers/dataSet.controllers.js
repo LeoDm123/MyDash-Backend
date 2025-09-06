@@ -195,7 +195,7 @@ const getDatasets = async (req, res) => {
   }
 };
 
-const getUserById = async (req, res) => {
+const getDatasetById = async (req, res) => {
   try {
     const datasets = await CashDataset.findById(req.params.id);
 
@@ -210,4 +210,4 @@ const getUserById = async (req, res) => {
   }
 };
 
-module.exports = { createDataset };
+module.exports = { createDataset, getDatasets, getDatasetById };
