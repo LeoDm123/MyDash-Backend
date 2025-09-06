@@ -180,4 +180,34 @@ const createDataset = async (req, res) => {
   }
 };
 
+const getDatasets = async (req, res) => {
+  try {
+    const datasets = await CashDataset.find();
+
+    if (!users) {
+      return res.status(404).json({ message: "Datasets no encontrados" });
+    }
+
+    return res.status(200).json(users);
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+const getUserById = async (req, res) => {
+  try {
+    const datasets = await CashDataset.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    return res.status(200).json(user);
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
 module.exports = { createDataset };
