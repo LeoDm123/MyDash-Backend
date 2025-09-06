@@ -184,13 +184,13 @@ const getDatasets = async (req, res) => {
   try {
     const datasets = await CashDataset.find();
 
-    if (!users) {
+    if (!datasets || datasets.length === 0) {
       return res.status(404).json({ message: "Datasets no encontrados" });
     }
 
-    return res.status(200).json(users);
+    return res.status(200).json(datasets);
   } catch (error) {
-    console.log(error);
+    console.error("[getDatasets] error:", error);
     return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
