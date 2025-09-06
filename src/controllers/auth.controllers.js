@@ -3,7 +3,6 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const sendMail = require("../services/emailService");
-const generarSitemap = require("../services/generarSitemap");
 
 const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -110,13 +109,13 @@ const verifyEmail = async (req, res) => {
 
 const userLogin = async (req, res) => {
   try {
-    const { userEmail, userPassword } = req.body;
+    const { email, password } = req.body;
 
-    if (typeof userEmail !== "string" || !emailRegex.test(userEmail)) {
+    if (typeof email !== "string" || !emailRegex.test(email)) {
       return res.status(400).json({ msg: "Email inválido" });
     }
 
-    let user = await Users.findOne({ email: userEmail });
+    let user = await Users.findOne({ email: email });
 
     if (!user) {
       return res.status(401).json({
@@ -130,7 +129,7 @@ const userLogin = async (req, res) => {
       });
     }
 
-    const isPasswordValid = await bcrypt.compare(userPassword, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -148,6 +147,9 @@ const userLogin = async (req, res) => {
       msg: "Usuario autenticado.",
       token,
       user: {
+        name: user.personalData.firstName,
+        lastName: user.personalData.lastName,
+        email: user.email,
         role: user.role,
       },
     });
@@ -293,43 +295,43 @@ const sendPasswordResetEmail = async (req, res) => {
   }
 };
 
-const sendVerificationEmail = async (req, res) => {
-  const { email } = req.body;
+// const sendVerificationEmail = async (req, res) => {
+//   const { email } = req.body;
 
-  if (typeof email !== "string" || !emailRegex.test(email)) {
-    return res.status(400).json({ msg: "Email inválido" });
-  }
+//   if (typeof email !== "string" || !emailRegex.test(email)) {
+//     return res.status(400).json({ msg: "Email inválido" });
+//   }
 
-  try {
-    const user = await Users.findOne({ email });
+//   try {
+//     const user = await Users.findOne({ email });
 
-    if (!user) {
-      return res.status(404).json({ msg: "Usuario no encontrado" });
-    }
+//     if (!user) {
+//       return res.status(404).json({ msg: "Usuario no encontrado" });
+//     }
 
-    if (user.emailVerified) {
-      return res.status(400).json({ msg: "El email ya está verificado" });
-    }
+//     if (user.emailVerified) {
+//       return res.status(400).json({ msg: "El email ya está verificado" });
+//     }
 
-    const verificationToken = crypto.randomBytes(32).toString("hex");
-    user.verificationToken = verificationToken;
-    await user.save();
+//     const verificationToken = crypto.randomBytes(32).toString("hex");
+//     user.verificationToken = verificationToken;
+//     await user.save();
 
-    await sendMail(
-      email,
-      verificationToken,
-      user.personalData.firstName,
-      "verify"
-    );
+//     await sendMail(
+//       email,
+//       verificationToken,
+//       user.personalData.firstName,
+//       "verify"
+//     );
 
-    res.status(200).json({
-      msg: "Email de verificación enviado",
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ msg: "Error al enviar el email de verificación" });
-  }
-};
+//     res.status(200).json({
+//       msg: "Email de verificación enviado",
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ msg: "Error al enviar el email de verificación" });
+//   }
+// };
 
 const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
@@ -363,17 +365,6 @@ const resetPassword = async (req, res) => {
   }
 };
 
-const generarSitemapController = async (req, res) => {
-  try {
-    const xml = await generarSitemap(); // obtené el XML en string
-    res.set("Content-Type", "application/xml"); // importante
-    res.status(200).send(xml);
-  } catch (error) {
-    console.error("❌ Error al generar sitemap:", error.message);
-    res.status(500).json({ message: "Error al generar sitemap" });
-  }
-};
-
 module.exports = {
   createUser,
   verifyEmail,
@@ -384,7 +375,5 @@ module.exports = {
   updateUser,
   deleteUser,
   sendPasswordResetEmail,
-  sendVerificationEmail,
   resetPassword,
-  generarSitemapController,
 };

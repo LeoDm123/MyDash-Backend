@@ -9,9 +9,7 @@ const {
   updateUser,
   deleteUser,
   sendPasswordResetEmail,
-  sendVerificationEmail,
   resetPassword,
-  generarSitemapController,
 } = require("../controllers/auth.controllers");
 
 const routerAuth = express.Router();
@@ -25,8 +23,6 @@ routerAuth.get("/getUserById/:id", getUserById);
 routerAuth.put("/updateUser/:id", updateUser);
 routerAuth.delete("/deleteUser/:id", deleteUser);
 routerAuth.post("/sendPasswordResetEmail", sendPasswordResetEmail);
-routerAuth.post("/sendVerificationEmail", sendVerificationEmail);
 routerAuth.put("/resetPassword", resetPassword);
-routerAuth.get("/sitemap.xml", generarSitemapController);
 
 module.exports = routerAuth;

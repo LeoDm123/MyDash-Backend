@@ -10,11 +10,7 @@ const app = express();
 
 app.set("trust proxy", 1);
 
-const allowedOrigins = [
-  "https://todobeca.com",
-  "https://todobeca-admin.vercel.app",
-  "http://localhost:4040",
-];
+const allowedOrigins = ["http://localhost:4040", "http://localhost:5173"];
 
 app.use(
   cors({
@@ -45,15 +41,7 @@ app.use(helmet());
 dbConnection();
 
 app.use("/auth", require("./src/routes/auth"));
-app.use("/beca", require("./src/routes/beca"));
-app.use("/pais", require("./src/routes/pais"));
-app.use("/parametros", require("./src/routes/parametros"));
-app.use("/chat", require("./src/routes/chat"));
-
-const {
-  generarSitemapController,
-} = require("./src/controllers/auth.controllers");
-app.get("/sitemap.xml", generarSitemapController);
+app.use("/dataSet", require("./src/routes/dataSet"));
 
 app.listen(process.env.PORT, () => {
   console.log(`✅ Servidor corriendo en el puerto ${process.env.PORT}`);
