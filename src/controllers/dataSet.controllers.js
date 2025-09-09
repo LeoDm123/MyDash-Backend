@@ -154,8 +154,7 @@ const createDataset = async (req, res) => {
     }
     const totals = { ingresos, egresos, balance: ingresos - egresos };
 
-    // Evitar duplicados por (datasetName + fileChecksum)
-    const dup = await DatasetModel.findOne({ datasetName, fileChecksum })
+    const dup = await DatasetModel.findOne({ datasetName })
       .select("_id")
       .lean();
     if (dup) {
