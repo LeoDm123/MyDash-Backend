@@ -53,9 +53,8 @@ const createDataset = async (req, res) => {
     originalFileName,
     importedBy,
     currency,
-    fileChecksum,
-    movements,
     datasetType,
+    movements,
   } = req.body || {};
 
   // Validaciones sencillas
@@ -155,16 +154,6 @@ const createDataset = async (req, res) => {
     }
     const totals = { ingresos, egresos, balance: ingresos - egresos };
 
-    // Checksum opcional para idempotencia
-    if (!fileChecksum) {
-      fileChecksum = sha256({
-        datasetName,
-        originalFileName,
-        currency,
-        movements: normalized,
-      });
-    }
-
     // Evitar duplicados por (datasetName + fileChecksum)
     const dup = await DatasetModel.findOne({ datasetName, fileChecksum })
       .select("_id")
@@ -182,7 +171,6 @@ const createDataset = async (req, res) => {
       originalFileName,
       importedBy,
       currency,
-      fileChecksum,
       datasetType,
       periodStart,
       periodEnd,
