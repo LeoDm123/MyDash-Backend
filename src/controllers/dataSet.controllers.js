@@ -173,7 +173,6 @@ const createDataset = async (req, res) => {
       datasetType,
       periodStart,
       periodEnd,
-      totals,
       movements: normalized,
     });
 
