@@ -1,5 +1,8 @@
 const crypto = require("crypto");
-const { CashDataset } = require("../models/cashflow-model");
+const {
+  getDatasetModel,
+  getAllDatasetModels,
+} = require("../models/dataset-models");
 
 // Valida fechas en ISO o dd/mm/yy(yy)
 function parseFecha(value) {
@@ -52,6 +55,7 @@ const createDataset = async (req, res) => {
     currency,
     fileChecksum,
     movements,
+    datasetType,
   } = req.body || {};
 
   // Validaciones sencillas
@@ -71,7 +75,30 @@ const createDataset = async (req, res) => {
   }
   currency = (currency || "ARS").trim();
 
+  // Validar datasetType
+  const validDatasetTypes = [
+    "cashflow",
+    "inventory",
+    "investment",
+    "humanResources",
+    "marketing",
+    "sales",
+    "other",
+  ];
+
+  if (datasetType && !validDatasetTypes.includes(datasetType)) {
+    return res.status(400).json({
+      msg: `datasetType inválido. Debe ser uno de: ${validDatasetTypes.join(
+        ", "
+      )}`,
+    });
+  }
+  datasetType = datasetType || "other";
+
   try {
+    // Obtener el modelo correcto según el tipo
+    const DatasetModel = getDatasetModel(datasetType);
+
     // Normalizar movimientos
     const normalized = [];
     for (const [i, m] of movements.entries()) {
@@ -139,7 +166,7 @@ const createDataset = async (req, res) => {
     }
 
     // Evitar duplicados por (datasetName + fileChecksum)
-    const dup = await CashDataset.findOne({ datasetName, fileChecksum })
+    const dup = await DatasetModel.findOne({ datasetName, fileChecksum })
       .select("_id")
       .lean();
     if (dup) {
@@ -150,12 +177,13 @@ const createDataset = async (req, res) => {
     }
 
     // Guardar
-    const doc = await CashDataset.create({
+    const doc = await DatasetModel.create({
       datasetName,
       originalFileName,
       importedBy,
       currency,
       fileChecksum,
+      datasetType,
       periodStart,
       periodEnd,
       totals,
@@ -165,6 +193,7 @@ const createDataset = async (req, res) => {
     return res.status(201).json({
       msg: "Dataset creado",
       datasetId: doc._id,
+      datasetType: doc.datasetType,
       count: doc.movements.length,
       totals: doc.totals,
       period: { start: doc.periodStart, end: doc.periodEnd },
@@ -182,13 +211,36 @@ const createDataset = async (req, res) => {
 
 const getDatasets = async (req, res) => {
   try {
-    const datasets = await CashDataset.find();
+    const { datasetType } = req.query;
 
-    if (!datasets || datasets.length === 0) {
-      return res.status(404).json({ message: "Datasets no encontrados" });
+    let datasets = [];
+
+    if (datasetType) {
+      // Buscar en un modelo específico
+      const DatasetModel = getDatasetModel(datasetType);
+      datasets = await DatasetModel.find({}).sort({ createdAt: -1 });
+    } else {
+      // Buscar en todos los modelos
+      const allModels = getAllDatasetModels();
+      const allDatasets = await Promise.all(
+        allModels.map((model) => model.find({}).sort({ createdAt: -1 }))
+      );
+      datasets = allDatasets.flat();
     }
 
-    return res.status(200).json(datasets);
+    if (!datasets || datasets.length === 0) {
+      return res.status(404).json({
+        message: datasetType
+          ? `No se encontraron datasets de tipo: ${datasetType}`
+          : "Datasets no encontrados",
+      });
+    }
+
+    return res.status(200).json({
+      datasets,
+      count: datasets.length,
+      datasetType: datasetType || "all",
+    });
   } catch (error) {
     console.error("[getDatasets] error:", error);
     return res.status(500).json({ message: "Error interno del servidor" });
@@ -197,17 +249,210 @@ const getDatasets = async (req, res) => {
 
 const getDatasetById = async (req, res) => {
   try {
-    const datasets = await CashDataset.findById(req.params.id);
+    const { id } = req.params;
+    let dataset = null;
 
-    if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
+    // Buscar en todos los modelos
+    const allModels = getAllDatasetModels();
+    for (const model of allModels) {
+      dataset = await model.findById(id);
+      if (dataset) break;
     }
 
-    return res.status(200).json(user);
+    if (!dataset) {
+      return res.status(404).json({ message: "Dataset no encontrado" });
+    }
+
+    return res.status(200).json(dataset);
   } catch (error) {
     console.log(error);
     return res.status(500).json({ message: "Error interno del servidor" });
   }
 };
 
-module.exports = { createDataset, getDatasets, getDatasetById };
+const getDatasetsByType = async (req, res) => {
+  try {
+    const { datasetModels } = require("../models/dataset-models");
+    const folders = [];
+
+    // Obtener datasets de cada modelo
+    for (const [type, model] of Object.entries(datasetModels)) {
+      const datasets = await model.find({}).sort({ createdAt: -1 });
+
+      if (datasets.length > 0) {
+        const formattedDatasets = datasets.map((dataset) => ({
+          _id: dataset._id,
+          datasetName: dataset.datasetName,
+          originalFileName: dataset.originalFileName,
+          importedAt: dataset.importedAt,
+          importedBy: dataset.importedBy,
+          currency: dataset.currency,
+          periodStart: dataset.periodStart,
+          periodEnd: dataset.periodEnd,
+          totals: dataset.totals,
+          movementsCount: dataset.movements.length,
+        }));
+
+        folders.push({
+          folderName: type,
+          displayName: getDisplayName(type),
+          count: datasets.length,
+          datasets: formattedDatasets,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      message: "Datasets organizados por tipo",
+      folders,
+      totalFolders: folders.length,
+      totalDatasets: folders.reduce((sum, folder) => sum + folder.count, 0),
+    });
+  } catch (error) {
+    console.error("[getDatasetsByType] error:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+// Función auxiliar para obtener nombres más amigables
+function getDisplayName(datasetType) {
+  const displayNames = {
+    cashflow: "Flujo de Caja",
+    inventory: "Inventario",
+    investment: "Inversiones",
+    humanResources: "Recursos Humanos",
+    marketing: "Marketing",
+    sales: "Ventas",
+    other: "Otros",
+  };
+  return displayNames[datasetType] || "Otros";
+}
+
+const addMovementsToDataset = async (req, res) => {
+  const { datasetId } = req.params;
+  const { movements } = req.body || {};
+
+  // Validaciones básicas
+  if (!datasetId) {
+    return res.status(400).json({ msg: "datasetId es requerido" });
+  }
+
+  if (!Array.isArray(movements) || movements.length === 0) {
+    return res
+      .status(400)
+      .json({ msg: "movements debe ser un array con al menos 1 elemento" });
+  }
+
+  try {
+    // Buscar el dataset existente en todos los modelos
+    const allModels = getAllDatasetModels();
+    let dataset = null;
+    let datasetType = null;
+
+    for (const model of allModels) {
+      dataset = await model.findById(datasetId);
+      if (dataset) {
+        // Determinar el tipo basado en el modelo
+        const modelName = model.modelName;
+        datasetType = Object.keys(
+          require("../models/dataset-models").datasetModels
+        ).find(
+          (type) =>
+            require("../models/dataset-models").datasetModels[type]
+              .modelName === modelName
+        );
+        break;
+      }
+    }
+
+    if (!dataset) {
+      return res.status(404).json({ msg: "Dataset no encontrado" });
+    }
+
+    // Normalizar los nuevos movimientos usando la misma lógica que createDataset
+    const normalizedMovements = [];
+    for (const [i, m] of movements.entries()) {
+      const tipo = typeof m?.tipo === "string" ? m.tipo.trim() : "";
+      if (tipo !== "ingreso" && tipo !== "egreso") {
+        return res.status(400).json({
+          msg: `Movimiento #${i + 1}: tipo inválido (ingreso|egreso)`,
+        });
+      }
+
+      const fecha = parseFecha(m?.fecha);
+      if (!fecha) {
+        return res
+          .status(400)
+          .json({ msg: `Movimiento #${i + 1}: fecha inválida` });
+      }
+
+      const montoNum = Number(m?.monto);
+      if (!montoNum || isNaN(montoNum) || montoNum <= 0) {
+        return res
+          .status(400)
+          .json({ msg: `Movimiento #${i + 1}: monto inválido (debe ser > 0)` });
+      }
+
+      const categoria = normalizeCategoria(m?.categoria);
+      const saldo = typeof m?.saldo === "number" ? m.saldo : undefined;
+      const nota =
+        m?.nota && String(m.nota).trim().length > 0
+          ? String(m.nota).trim()
+          : undefined;
+
+      normalizedMovements.push({
+        fecha,
+        categoria,
+        tipo,
+        monto: Math.abs(montoNum),
+        saldo,
+        nota,
+      });
+    }
+
+    // Agregar los nuevos movimientos al array existente
+    dataset.movements.push(...normalizedMovements);
+
+    // Recalcular fechas del período
+    const allFechas = dataset.movements
+      .map((x) => x.fecha)
+      .sort((a, b) => a - b);
+    dataset.periodStart = allFechas[0];
+    dataset.periodEnd = allFechas[allFechas.length - 1];
+
+    // Recalcular totales
+    let ingresos = 0;
+    let egresos = 0;
+    for (const m of dataset.movements) {
+      if (m.tipo === "ingreso") ingresos += m.monto;
+      else egresos += m.monto;
+    }
+    dataset.totals = { ingresos, egresos, balance: ingresos - egresos };
+
+    // Guardar el dataset actualizado
+    await dataset.save();
+
+    return res.status(200).json({
+      msg: "Movimientos agregados exitosamente",
+      datasetId: dataset._id,
+      datasetType: datasetType,
+      movementsAdded: normalizedMovements.length,
+      totalMovements: dataset.movements.length,
+      totals: dataset.totals,
+      period: { start: dataset.periodStart, end: dataset.periodEnd },
+    });
+  } catch (error) {
+    console.error("[addMovementsToDataset] error:", error);
+    return res
+      .status(500)
+      .json({ msg: "Error interno al agregar movimientos" });
+  }
+};
+
+module.exports = {
+  createDataset,
+  getDatasets,
+  getDatasetById,
+  getDatasetsByType,
+  addMovementsToDataset,
+};

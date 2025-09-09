@@ -32,10 +32,10 @@ movementSchema.pre("validate", function (next) {
 });
 
 /**
- * Documento principal: un dataset (archivo entero importado)
- * Guarda metadatos del archivo y un array con TODOS los movimientos
+ * Schema base para todos los tipos de datasets
+ * Contiene la estructura común que comparten todos los tipos
  */
-const datasetSchema = new Schema(
+const baseDatasetSchema = new Schema(
   {
     // Metadatos del archivo/dataset
     datasetName: { type: String, required: true, trim: true }, // ej "Caja2024"
@@ -49,21 +49,6 @@ const datasetSchema = new Schema(
     periodEnd: { type: Date, required: false, index: true },
 
     currency: { type: String, default: "ARS" },
-
-    datasetType: {
-      type: String,
-      required: false,
-      trim: true,
-      enum: [
-        "cashflow",
-        "inventory",
-        "investment",
-        "humanResources",
-        "marketing",
-        "sales",
-        "other",
-      ],
-    },
 
     // Resúmenes agregados (opcionales, precomputados al importar)
     totals: {
@@ -91,17 +76,17 @@ const datasetSchema = new Schema(
   }
 );
 
-// Índices útiles
-datasetSchema.index({ datasetName: 1, importedAt: -1 });
-datasetSchema.index({ "movements.fecha": 1 });
-datasetSchema.index({ "movements.tipo": 1 });
-datasetSchema.index({
+// Índices comunes para todos los tipos
+baseDatasetSchema.index({ datasetName: 1, importedAt: -1 });
+baseDatasetSchema.index({ "movements.fecha": 1 });
+baseDatasetSchema.index({ "movements.tipo": 1 });
+baseDatasetSchema.index({
   "movements.categoria.grupo": 1,
   "movements.categoria.subgrupo": 1,
 });
 
 // Totales automáticos si no los proveés
-datasetSchema.pre("save", function (next) {
+baseDatasetSchema.pre("save", function (next) {
   if (!this.movements || this.movements.length === 0) {
     this.totals = { ingresos: 0, egresos: 0, balance: 0 };
     return next();
@@ -130,9 +115,47 @@ datasetSchema.pre("save", function (next) {
   next();
 });
 
-const CashDataset = model("CashDataset", datasetSchema);
+// Crear modelos específicos para cada tipo
+const CashDataset = model("CashDataset", baseDatasetSchema);
+const InventoryDataset = model("InventoryDataset", baseDatasetSchema);
+const InvestmentDataset = model("InvestmentDataset", baseDatasetSchema);
+const HumanResourcesDataset = model("HumanResourcesDataset", baseDatasetSchema);
+const MarketingDataset = model("MarketingDataset", baseDatasetSchema);
+const SalesDataset = model("SalesDataset", baseDatasetSchema);
+const OtherDataset = model("OtherDataset", baseDatasetSchema);
+
+// Mapeo de tipos a modelos
+const datasetModels = {
+  cashflow: CashDataset,
+  inventory: InventoryDataset,
+  investment: InvestmentDataset,
+  humanResources: HumanResourcesDataset,
+  marketing: MarketingDataset,
+  sales: SalesDataset,
+  other: OtherDataset,
+};
+
+// Función para obtener el modelo correcto según el tipo
+function getDatasetModel(datasetType) {
+  return datasetModels[datasetType] || OtherDataset;
+}
+
+// Función para obtener todos los modelos
+function getAllDatasetModels() {
+  return Object.values(datasetModels);
+}
 
 module.exports = {
+  movementSchema,
+  baseDatasetSchema,
   CashDataset,
-  movementSchema, // exporto también el sub-schema por si querés reutilizarlo en otro lado
+  InventoryDataset,
+  InvestmentDataset,
+  HumanResourcesDataset,
+  MarketingDataset,
+  SalesDataset,
+  OtherDataset,
+  datasetModels,
+  getDatasetModel,
+  getAllDatasetModels,
 };
