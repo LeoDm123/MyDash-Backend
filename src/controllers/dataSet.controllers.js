@@ -1,5 +1,30 @@
 const crypto = require("crypto");
-const { datasetModels } = require("../models/cashflow-model");
+const { CashDataset } = require("../models/cashflow-model");
+
+/*
+ * NOTA PARA FUTUROS MODELOS ESPECÍFICOS:
+ *
+ * Cuando se agreguen nuevos tipos de datasets con sus propios modelos:
+ * 1. Crear archivos de modelo específicos (ej: inventory-model.js, sales-model.js)
+ * 2. Importar todos los modelos aquí
+ * 3. Crear función getDatasetModel(datasetType) que retorne el modelo correcto
+ * 4. Actualizar las funciones para usar getDatasetModel() en lugar de CashDataset directamente
+ *
+ * Ejemplo de estructura futura:
+ * const { CashDataset } = require("../models/cashflow-model");
+ * const { InventoryDataset } = require("../models/inventory-model");
+ * const { SalesDataset } = require("../models/sales-model");
+ *
+ * const datasetModels = {
+ *   cashflow: CashDataset,
+ *   inventory: InventoryDataset,
+ *   sales: SalesDataset,
+ * };
+ *
+ * function getDatasetModel(datasetType) {
+ *   return datasetModels[datasetType] || CashDataset;
+ * }
+ */
 
 // Valida fechas en ISO o dd/mm/yy(yy)
 function parseFecha(value) {
@@ -92,8 +117,8 @@ const createDataset = async (req, res) => {
   datasetType = datasetType || "other";
 
   try {
-    // Obtener el modelo correcto según el tipo
-    const DatasetModel = getDatasetModel(datasetType);
+    // Por ahora solo usamos CashDataset, pero la estructura está preparada para futuros modelos específicos
+    const DatasetModel = CashDataset;
 
     // Normalizar movimientos
     const normalized = [];
@@ -193,19 +218,16 @@ const getDatasets = async (req, res) => {
   try {
     const { datasetType } = req.query;
 
+    // Por ahora solo usamos CashDataset, pero la estructura está preparada para futuros modelos específicos
     let datasets = [];
 
     if (datasetType) {
-      // Buscar en un modelo específico
-      const DatasetModel = getDatasetModel(datasetType);
-      datasets = await DatasetModel.find({}).sort({ createdAt: -1 });
+      // Si se especifica un tipo, buscar solo en CashDataset por ahora
+      // En el futuro, aquí se determinaría qué modelo usar según el tipo
+      datasets = await CashDataset.find({}).sort({ createdAt: -1 });
     } else {
-      // Buscar en todos los modelos
-      const allModels = getAllDatasetModels();
-      const allDatasets = await Promise.all(
-        allModels.map((model) => model.find({}).sort({ createdAt: -1 }))
-      );
-      datasets = allDatasets.flat();
+      // Buscar todos los datasets en CashDataset
+      datasets = await CashDataset.find({}).sort({ createdAt: -1 });
     }
 
     if (!datasets || datasets.length === 0) {
@@ -230,14 +252,10 @@ const getDatasets = async (req, res) => {
 const getDatasetById = async (req, res) => {
   try {
     const { id } = req.params;
-    let dataset = null;
 
-    // Buscar en todos los modelos
-    const allModels = getAllDatasetModels();
-    for (const model of allModels) {
-      dataset = await model.findById(id);
-      if (dataset) break;
-    }
+    // Por ahora solo buscamos en CashDataset
+    // En el futuro, aquí se buscaría en múltiples modelos según el tipo
+    const dataset = await CashDataset.findById(id);
 
     if (!dataset) {
       return res.status(404).json({ message: "Dataset no encontrado" });
@@ -254,30 +272,40 @@ const getDatasetsByType = async (req, res) => {
   try {
     const folders = [];
 
-    // Obtener datasets de cada modelo
-    for (const [type, model] of Object.entries(datasetModels)) {
-      const datasets = await model.find({}).sort({ createdAt: -1 });
+    // Por ahora solo usamos CashDataset, pero la estructura está preparada para futuros modelos específicos
+    // Obtener todos los datasets de CashDataset y agruparlos por datasetType
+    const allDatasets = await CashDataset.find({}).sort({ createdAt: -1 });
 
-      if (datasets.length > 0) {
-        const formattedDatasets = datasets.map((dataset) => ({
-          _id: dataset._id,
-          datasetName: dataset.datasetName,
-          originalFileName: dataset.originalFileName,
-          importedAt: dataset.importedAt,
-          importedBy: dataset.importedBy,
-          currency: dataset.currency,
-          periodStart: dataset.periodStart,
-          periodEnd: dataset.periodEnd,
-          movementsCount: dataset.movements.length,
-        }));
-
-        folders.push({
-          folderName: type,
-          displayName: getDisplayName(type),
-          count: datasets.length,
-          datasets: formattedDatasets,
-        });
+    // Agrupar por datasetType
+    const groupedDatasets = {};
+    for (const dataset of allDatasets) {
+      const type = dataset.datasetType || "other";
+      if (!groupedDatasets[type]) {
+        groupedDatasets[type] = [];
       }
+      groupedDatasets[type].push(dataset);
+    }
+
+    // Crear carpetas para cada tipo
+    for (const [type, datasets] of Object.entries(groupedDatasets)) {
+      const formattedDatasets = datasets.map((dataset) => ({
+        _id: dataset._id,
+        datasetName: dataset.datasetName,
+        originalFileName: dataset.originalFileName,
+        importedAt: dataset.importedAt,
+        importedBy: dataset.importedBy,
+        currency: dataset.currency,
+        periodStart: dataset.periodStart,
+        periodEnd: dataset.periodEnd,
+        movementsCount: dataset.movements.length,
+      }));
+
+      folders.push({
+        folderName: type,
+        displayName: getDisplayName(type),
+        count: datasets.length,
+        datasets: formattedDatasets,
+      });
     }
 
     return res.status(200).json({
@@ -322,26 +350,15 @@ const addMovementsToDataset = async (req, res) => {
   }
 
   try {
-    // Buscar el dataset existente en todos los modelos
-    const allModels = getAllDatasetModels();
-    let dataset = null;
-    let datasetType = null;
-
-    for (const model of allModels) {
-      dataset = await model.findById(datasetId);
-      if (dataset) {
-        // Determinar el tipo basado en el modelo
-        const modelName = model.modelName;
-        datasetType = Object.keys(datasetModels).find(
-          (type) => datasetModels[type].modelName === modelName
-        );
-        break;
-      }
-    }
+    // Por ahora solo buscamos en CashDataset
+    // En el futuro, aquí se buscaría en múltiples modelos según el tipo
+    const dataset = await CashDataset.findById(datasetId);
 
     if (!dataset) {
       return res.status(404).json({ msg: "Dataset no encontrado" });
     }
+
+    const datasetType = dataset.datasetType || "other";
 
     // Normalizar los nuevos movimientos usando la misma lógica que createDataset
     const normalizedMovements = [];

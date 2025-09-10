@@ -79,46 +79,9 @@ datasetSchema.index({
   "movements.categoria.subgrupo": 1,
 });
 
-// Crear modelos específicos para cada tipo
 const CashDataset = model("CashDataset", datasetSchema);
-const InventoryDataset = model("InventoryDataset", datasetSchema);
-const InvestmentDataset = model("InvestmentDataset", datasetSchema);
-const HumanResourcesDataset = model("HumanResourcesDataset", datasetSchema);
-const MarketingDataset = model("MarketingDataset", datasetSchema);
-const SalesDataset = model("SalesDataset", datasetSchema);
-const OtherDataset = model("OtherDataset", datasetSchema);
-
-// Mapeo de tipos a modelos
-const datasetModels = {
-  cashflow: CashDataset,
-  inventory: InventoryDataset,
-  investment: InvestmentDataset,
-  humanResources: HumanResourcesDataset,
-  marketing: MarketingDataset,
-  sales: SalesDataset,
-  other: OtherDataset,
-};
-
-// Función para obtener el modelo correcto según el tipo
-function getDatasetModel(datasetType) {
-  return datasetModels[datasetType] || OtherDataset;
-}
-
-// Función para obtener todos los modelos
-function getAllDatasetModels() {
-  return Object.values(datasetModels);
-}
 
 module.exports = {
   CashDataset,
-  InventoryDataset,
-  InvestmentDataset,
-  HumanResourcesDataset,
-  MarketingDataset,
-  SalesDataset,
-  OtherDataset,
   movementSchema,
-  datasetModels,
-  getDatasetModel,
-  getAllDatasetModels,
 };
