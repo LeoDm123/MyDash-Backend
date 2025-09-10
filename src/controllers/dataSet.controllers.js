@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const {
   getDatasetModel,
   getAllDatasetModels,
-} = require("../models/dataset-models");
+} = require("../models/cashflow-model");
 
 // Valida fechas en ISO o dd/mm/yy(yy)
 function parseFecha(value) {
@@ -179,8 +179,6 @@ const createDataset = async (req, res) => {
       msg: "Dataset creado",
       datasetId: doc._id,
       datasetType: doc.datasetType,
-      count: doc.movements.length,
-      totals: doc.totals,
       period: { start: doc.periodStart, end: doc.periodEnd },
     });
   } catch (err) {

@@ -79,34 +79,6 @@ datasetSchema.index({
   "movements.categoria.subgrupo": 1,
 });
 
-datasetSchema.pre("save", function (next) {
-  if (!this.movements || this.movements.length === 0) {
-    this.totals = { ingresos: 0, egresos: 0, balance: 0 };
-    return next();
-  }
-  let ingresos = 0;
-  let egresos = 0;
-  for (const m of this.movements) {
-    if (m?.tipo === "ingreso") ingresos += m.monto || 0;
-    else if (m?.tipo === "egreso") egresos += m.monto || 0;
-  }
-  this.totals.ingresos = ingresos;
-  this.totals.egresos = egresos;
-  this.totals.balance = ingresos - egresos;
-
-  if (!this.periodStart || !this.periodEnd) {
-    const fechas = this.movements
-      .map((m) => m.fecha)
-      .filter(Boolean)
-      .sort((a, b) => a - b);
-    if (fechas.length > 0) {
-      this.periodStart = this.periodStart || fechas[0];
-      this.periodEnd = this.periodEnd || fechas[fechas.length - 1];
-    }
-  }
-  next();
-});
-
 const CashDataset = model("CashDataset", datasetSchema);
 
 module.exports = {
