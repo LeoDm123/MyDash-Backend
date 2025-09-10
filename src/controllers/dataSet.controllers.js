@@ -1,8 +1,5 @@
 const crypto = require("crypto");
-const {
-  getDatasetModel,
-  getAllDatasetModels,
-} = require("../models/cashflow-model");
+const { datasetModels } = require("../models/cashflow-model");
 
 // Valida fechas en ISO o dd/mm/yy(yy)
 function parseFecha(value) {
@@ -255,7 +252,6 @@ const getDatasetById = async (req, res) => {
 
 const getDatasetsByType = async (req, res) => {
   try {
-    const { datasetModels } = require("../models/dataset-models");
     const folders = [];
 
     // Obtener datasets de cada modelo
@@ -336,12 +332,8 @@ const addMovementsToDataset = async (req, res) => {
       if (dataset) {
         // Determinar el tipo basado en el modelo
         const modelName = model.modelName;
-        datasetType = Object.keys(
-          require("../models/dataset-models").datasetModels
-        ).find(
-          (type) =>
-            require("../models/dataset-models").datasetModels[type]
-              .modelName === modelName
+        datasetType = Object.keys(datasetModels).find(
+          (type) => datasetModels[type].modelName === modelName
         );
         break;
       }
