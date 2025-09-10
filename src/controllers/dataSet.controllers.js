@@ -320,6 +320,72 @@ const getDatasetsByType = async (req, res) => {
   }
 };
 
+const getDatasetsByEmail = async (req, res) => {
+  try {
+    const { email } = req.params;
+    const { datasetType } = req.query;
+
+    // Validar que se proporcione el email
+    if (!email) {
+      return res.status(400).json({
+        msg: "Email es requerido",
+      });
+    }
+
+    // Validar formato básico de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        msg: "Formato de email inválido",
+      });
+    }
+
+    // Construir filtro de búsqueda
+    const filter = { importedBy: email };
+
+    // Si se especifica datasetType, agregarlo al filtro
+    if (datasetType) {
+      filter.datasetType = datasetType;
+    }
+
+    // Buscar datasets por email
+    const datasets = await CashDataset.find(filter).sort({ createdAt: -1 });
+
+    if (!datasets || datasets.length === 0) {
+      return res.status(404).json({
+        message: datasetType
+          ? `No se encontraron datasets de tipo "${datasetType}" para el email: ${email}`
+          : `No se encontraron datasets para el email: ${email}`,
+      });
+    }
+
+    // Formatear respuesta
+    const formattedDatasets = datasets.map((dataset) => ({
+      _id: dataset._id,
+      datasetName: dataset.datasetName,
+      originalFileName: dataset.originalFileName,
+      importedAt: dataset.importedAt,
+      importedBy: dataset.importedBy,
+      datasetType: dataset.datasetType || "other",
+      currency: dataset.currency,
+      periodStart: dataset.periodStart,
+      periodEnd: dataset.periodEnd,
+      movementsCount: dataset.movements.length,
+    }));
+
+    return res.status(200).json({
+      message: "Datasets encontrados",
+      email: email,
+      datasetType: datasetType || "all",
+      datasets: formattedDatasets,
+      count: datasets.length,
+    });
+  } catch (error) {
+    console.error("[getDatasetsByEmail] error:", error);
+    return res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
 // Función auxiliar para obtener nombres más amigables
 function getDisplayName(datasetType) {
   const displayNames = {
@@ -435,5 +501,6 @@ module.exports = {
   getDatasets,
   getDatasetById,
   getDatasetsByType,
+  getDatasetsByEmail,
   addMovementsToDataset,
 };
