@@ -2,7 +2,7 @@ const { Schema, model } = require("mongoose");
 
 const movementSchema = new Schema(
   {
-    fecha: { type: Date, required: true },
+    fecha: { type: String, required: true },
     categoria: {
       grupo: { type: String, required: true, trim: true },
       subgrupo: { type: String, required: false, trim: true },
