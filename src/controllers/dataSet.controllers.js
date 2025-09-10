@@ -370,7 +370,7 @@ const getDatasetsByEmail = async (req, res) => {
       currency: dataset.currency,
       periodStart: dataset.periodStart,
       periodEnd: dataset.periodEnd,
-      movementsCount: dataset.movements.length,
+      movements: dataset.movements,
     }));
 
     return res.status(200).json({
