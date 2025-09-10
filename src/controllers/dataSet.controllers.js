@@ -152,7 +152,6 @@ const createDataset = async (req, res) => {
       if (m.tipo === "ingreso") ingresos += m.monto;
       else egresos += m.monto;
     }
-    const totals = { ingresos, egresos, balance: ingresos - egresos };
 
     const dup = await DatasetModel.findOne({ datasetName })
       .select("_id")
@@ -275,7 +274,6 @@ const getDatasetsByType = async (req, res) => {
           currency: dataset.currency,
           periodStart: dataset.periodStart,
           periodEnd: dataset.periodEnd,
-          totals: dataset.totals,
           movementsCount: dataset.movements.length,
         }));
 
@@ -406,15 +404,6 @@ const addMovementsToDataset = async (req, res) => {
     dataset.periodStart = allFechas[0];
     dataset.periodEnd = allFechas[allFechas.length - 1];
 
-    // Recalcular totales
-    let ingresos = 0;
-    let egresos = 0;
-    for (const m of dataset.movements) {
-      if (m.tipo === "ingreso") ingresos += m.monto;
-      else egresos += m.monto;
-    }
-    dataset.totals = { ingresos, egresos, balance: ingresos - egresos };
-
     // Guardar el dataset actualizado
     await dataset.save();
 
@@ -424,7 +413,6 @@ const addMovementsToDataset = async (req, res) => {
       datasetType: datasetType,
       movementsAdded: normalizedMovements.length,
       totalMovements: dataset.movements.length,
-      totals: dataset.totals,
       period: { start: dataset.periodStart, end: dataset.periodEnd },
     });
   } catch (error) {
