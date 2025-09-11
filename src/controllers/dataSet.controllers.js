@@ -2,52 +2,37 @@ const crypto = require("crypto");
 const { CashDataset } = require("../models/cashflow-model");
 
 /*
- * NOTA PARA FUTUROS MODELOS ESPECÍFICOS:
- *
- * Cuando se agreguen nuevos tipos de datasets con sus propios modelos:
- * 1. Crear archivos de modelo específicos (ej: inventory-model.js, sales-model.js)
- * 2. Importar todos los modelos aquí
- * 3. Crear función getDatasetModel(datasetType) que retorne el modelo correcto
- * 4. Actualizar las funciones para usar getDatasetModel() en lugar de CashDataset directamente
- *
- * Ejemplo de estructura futura:
- * const { CashDataset } = require("../models/cashflow-model");
- * const { InventoryDataset } = require("../models/inventory-model");
- * const { SalesDataset } = require("../models/sales-model");
- *
- * const datasetModels = {
- *   cashflow: CashDataset,
- *   inventory: InventoryDataset,
- *   sales: SalesDataset,
- * };
- *
- * function getDatasetModel(datasetType) {
- *   return datasetModels[datasetType] || CashDataset;
- * }
+ * NOTA PARA FUTUROS MODELOS ESPECÍFICOS: (idéntica a tu comentario original)
+ * ...
  */
 
-// Valida fechas en ISO o dd/mm/yy(yy)
-function parseFecha(value) {
-  if (!value) return null;
-  if (value instanceof Date && !isNaN(value.getTime())) return value;
+/**
+ * ==========================
+ *  Helpers de fecha (string)
+ * ==========================
+ */
 
-  const iso = new Date(value);
-  if (!isNaN(iso.getTime())) return iso;
-
-  const m = String(value)
-    .trim()
-    .match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
-  if (m) {
-    const dd = Number(m[1]);
-    const mm = Number(m[2]);
-    let yy = Number(m[3]);
-    if (yy < 100) yy += 2000;
-    return new Date(Date.UTC(yy, mm - 1, dd));
-  }
-  return null;
+/** Valida que la fecha sea un string DD/MM/YY o DD/MM/YYYY (no convierte a Date). */
+function isFechaString(value) {
+  if (value == null) return false;
+  const s = String(value).trim();
+  return /^\d{2}\/\d{2}\/\d{2}(\d{2})?$/.test(s);
 }
 
-// Acepta obj {grupo,subgrupo} o string "Grupo:Subgrupo"
+/** Clave auxiliar de ordenamiento (YYMMDD o YYYYMMDD). No altera el valor real. */
+function toSortableKeyYY(fechaStr) {
+  const s = String(fechaStr).trim();
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{2}(\d{2})?)$/);
+  if (!m) return s; // si no matchea, devolvemos tal cual (quedará al final)
+  const dd = m[1];
+  const mm = m[2];
+  const yy = m[3]; // puede ser 2 o 4 dígitos; usamos lo que venga sin inferir siglo
+  return `${yy.padStart(2, "0")}${mm}${dd}`;
+}
+
+/**
+ * Acepta obj {grupo,subgrupo} o string "Grupo:Subgrupo"
+ */
 function normalizeCategoria(categoria) {
   if (!categoria) return { grupo: "SinClasificar", subgrupo: null };
   if (typeof categoria === "string") {
@@ -117,10 +102,10 @@ const createDataset = async (req, res) => {
   datasetType = datasetType || "other";
 
   try {
-    // Por ahora solo usamos CashDataset, pero la estructura está preparada para futuros modelos específicos
+    // Por ahora solo usamos CashDataset
     const DatasetModel = CashDataset;
 
-    // Normalizar movimientos
+    // Normalizar movimientos SIN convertir fecha a Date
     const normalized = [];
     for (const [i, m] of movements.entries()) {
       const tipo = typeof m?.tipo === "string" ? m.tipo.trim() : "";
@@ -130,12 +115,13 @@ const createDataset = async (req, res) => {
         });
       }
 
-      const fecha = parseFecha(m?.fecha);
-      if (!fecha) {
-        return res
-          .status(400)
-          .json({ msg: `Movimiento #${i + 1}: fecha inválida` });
+      const fechaRaw = m?.fecha;
+      if (!isFechaString(fechaRaw)) {
+        return res.status(400).json({
+          msg: `Movimiento #${i + 1}: fecha inválida (DD/MM/YY o DD/MM/YYYY)`,
+        });
       }
+      const fecha = String(fechaRaw).trim(); // <-- se guarda EXACTAMENTE como vino
 
       const montoNum = Number(m?.monto);
       if (!montoNum || isNaN(montoNum) || montoNum <= 0) {
@@ -154,20 +140,26 @@ const createDataset = async (req, res) => {
       const externalId = m?.externalId || undefined;
 
       normalized.push({
-        fecha,
+        fecha, // <-- string intacto
         categoria,
         tipo,
         monto: Math.abs(montoNum),
         saldo,
         nota,
+        source,
+        externalId,
       });
     }
 
-    // Periodo y totales simples (el schema también los calcula en pre-save)
-    const fechas = normalized.map((x) => x.fecha).sort((a, b) => a - b);
-    const periodStart = fechas[0];
-    const periodEnd = fechas[fechas.length - 1];
+    // Periodo (ordenando strings por clave auxiliar YYMMDD/YYYMMDD)
+    const fechasOrdenadas = normalized
+      .map((x) => x.fecha)
+      .sort((a, b) => toSortableKeyYY(a).localeCompare(toSortableKeyYY(b)));
 
+    const periodStart = fechasOrdenadas[0] || undefined; // string
+    const periodEnd = fechasOrdenadas[fechasOrdenadas.length - 1] || undefined; // string
+
+    // (Opcional) Totales simples
     let ingresos = 0;
     let egresos = 0;
     for (const m of normalized) {
@@ -175,6 +167,7 @@ const createDataset = async (req, res) => {
       else egresos += m.monto;
     }
 
+    // Evitar duplicados por nombre (tu lógica original)
     const dup = await DatasetModel.findOne({ datasetName })
       .select("_id")
       .lean();
@@ -185,15 +178,15 @@ const createDataset = async (req, res) => {
       });
     }
 
-    // Guardar
+    // Guardar (asegurate que en el schema fecha/periodStart/periodEnd sean String)
     const doc = await DatasetModel.create({
       datasetName,
       originalFileName,
       importedBy,
       currency,
       datasetType,
-      periodStart,
-      periodEnd,
+      periodStart, // <-- string
+      periodEnd, // <-- string
       movements: normalized,
     });
 
@@ -218,15 +211,14 @@ const getDatasets = async (req, res) => {
   try {
     const { datasetType } = req.query;
 
-    // Por ahora solo usamos CashDataset, pero la estructura está preparada para futuros modelos específicos
+    // Por ahora solo CashDataset
     let datasets = [];
 
     if (datasetType) {
-      // Si se especifica un tipo, buscar solo en CashDataset por ahora
-      // En el futuro, aquí se determinaría qué modelo usar según el tipo
-      datasets = await CashDataset.find({}).sort({ createdAt: -1 });
+      datasets = await CashDataset.find({ datasetType }).sort({
+        createdAt: -1,
+      });
     } else {
-      // Buscar todos los datasets en CashDataset
       datasets = await CashDataset.find({}).sort({ createdAt: -1 });
     }
 
@@ -253,8 +245,6 @@ const getDatasetById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Por ahora solo buscamos en CashDataset
-    // En el futuro, aquí se buscaría en múltiples modelos según el tipo
     const dataset = await CashDataset.findById(id);
 
     if (!dataset) {
@@ -272,11 +262,8 @@ const getDatasetsByType = async (req, res) => {
   try {
     const folders = [];
 
-    // Por ahora solo usamos CashDataset, pero la estructura está preparada para futuros modelos específicos
-    // Obtener todos los datasets de CashDataset y agruparlos por datasetType
     const allDatasets = await CashDataset.find({}).sort({ createdAt: -1 });
 
-    // Agrupar por datasetType
     const groupedDatasets = {};
     for (const dataset of allDatasets) {
       const type = dataset.datasetType || "other";
@@ -286,7 +273,6 @@ const getDatasetsByType = async (req, res) => {
       groupedDatasets[type].push(dataset);
     }
 
-    // Crear carpetas para cada tipo
     for (const [type, datasets] of Object.entries(groupedDatasets)) {
       const formattedDatasets = datasets.map((dataset) => ({
         _id: dataset._id,
@@ -295,8 +281,8 @@ const getDatasetsByType = async (req, res) => {
         importedAt: dataset.importedAt,
         importedBy: dataset.importedBy,
         currency: dataset.currency,
-        periodStart: dataset.periodStart,
-        periodEnd: dataset.periodEnd,
+        periodStart: dataset.periodStart, // string
+        periodEnd: dataset.periodEnd, // string
         movementsCount: dataset.movements.length,
       }));
 
@@ -325,30 +311,20 @@ const getDatasetsByEmail = async (req, res) => {
     const { email } = req.params;
     const { datasetType } = req.query;
 
-    // Validar que se proporcione el email
     if (!email) {
-      return res.status(400).json({
-        msg: "Email es requerido",
-      });
+      return res.status(400).json({ msg: "Email es requerido" });
     }
 
-    // Validar formato básico de email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        msg: "Formato de email inválido",
-      });
+      return res.status(400).json({ msg: "Formato de email inválido" });
     }
 
-    // Construir filtro de búsqueda
     const filter = { importedBy: email };
-
-    // Si se especifica datasetType, agregarlo al filtro
     if (datasetType) {
       filter.datasetType = datasetType;
     }
 
-    // Buscar datasets por email
     const datasets = await CashDataset.find(filter).sort({ createdAt: -1 });
 
     if (!datasets || datasets.length === 0) {
@@ -359,7 +335,6 @@ const getDatasetsByEmail = async (req, res) => {
       });
     }
 
-    // Formatear respuesta
     const formattedDatasets = datasets.map((dataset) => ({
       _id: dataset._id,
       datasetName: dataset.datasetName,
@@ -368,8 +343,8 @@ const getDatasetsByEmail = async (req, res) => {
       importedBy: dataset.importedBy,
       datasetType: dataset.datasetType || "other",
       currency: dataset.currency,
-      periodStart: dataset.periodStart,
-      periodEnd: dataset.periodEnd,
+      periodStart: dataset.periodStart, // string
+      periodEnd: dataset.periodEnd, // string
       movements: dataset.movements,
     }));
 
@@ -404,7 +379,6 @@ const addMovementsToDataset = async (req, res) => {
   const { datasetId } = req.params;
   const { movements } = req.body || {};
 
-  // Validaciones básicas
   if (!datasetId) {
     return res.status(400).json({ msg: "datasetId es requerido" });
   }
@@ -416,8 +390,6 @@ const addMovementsToDataset = async (req, res) => {
   }
 
   try {
-    // Por ahora solo buscamos en CashDataset
-    // En el futuro, aquí se buscaría en múltiples modelos según el tipo
     const dataset = await CashDataset.findById(datasetId);
 
     if (!dataset) {
@@ -426,7 +398,7 @@ const addMovementsToDataset = async (req, res) => {
 
     const datasetType = dataset.datasetType || "other";
 
-    // Normalizar los nuevos movimientos usando la misma lógica que createDataset
+    // Normalizar nuevos movimientos (fecha como string)
     const normalizedMovements = [];
     for (const [i, m] of movements.entries()) {
       const tipo = typeof m?.tipo === "string" ? m.tipo.trim() : "";
@@ -436,12 +408,13 @@ const addMovementsToDataset = async (req, res) => {
         });
       }
 
-      const fecha = parseFecha(m?.fecha);
-      if (!fecha) {
-        return res
-          .status(400)
-          .json({ msg: `Movimiento #${i + 1}: fecha inválida` });
+      const fechaRaw = m?.fecha;
+      if (!isFechaString(fechaRaw)) {
+        return res.status(400).json({
+          msg: `Movimiento #${i + 1}: fecha inválida (DD/MM/YY o DD/MM/YYYY)`,
+        });
       }
+      const fecha = String(fechaRaw).trim(); // <-- string
 
       const montoNum = Number(m?.monto);
       if (!montoNum || isNaN(montoNum) || montoNum <= 0) {
@@ -456,28 +429,32 @@ const addMovementsToDataset = async (req, res) => {
         m?.nota && String(m.nota).trim().length > 0
           ? String(m.nota).trim()
           : undefined;
+      const source = m?.source || "csv";
+      const externalId = m?.externalId || undefined;
 
       normalizedMovements.push({
-        fecha,
+        fecha, // <-- string intacto
         categoria,
         tipo,
         monto: Math.abs(montoNum),
         saldo,
         nota,
+        source,
+        externalId,
       });
     }
 
-    // Agregar los nuevos movimientos al array existente
+    // Agregar y recalcular periodo (usando strings)
     dataset.movements.push(...normalizedMovements);
 
-    // Recalcular fechas del período
     const allFechas = dataset.movements
       .map((x) => x.fecha)
-      .sort((a, b) => a - b);
-    dataset.periodStart = allFechas[0];
-    dataset.periodEnd = allFechas[allFechas.length - 1];
+      .filter(Boolean)
+      .sort((a, b) => toSortableKeyYY(a).localeCompare(toSortableKeyYY(b)));
 
-    // Guardar el dataset actualizado
+    dataset.periodStart = allFechas[0] || dataset.periodStart;
+    dataset.periodEnd = allFechas[allFechas.length - 1] || dataset.periodEnd;
+
     await dataset.save();
 
     return res.status(200).json({

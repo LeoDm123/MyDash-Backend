@@ -1,48 +1,44 @@
-const { Schema, model } = require("mongoose");
+const mongoose = require("mongoose");
 
-const movementSchema = new Schema(
+const CategorySchema = new mongoose.Schema(
   {
-    fecha: { type: String, required: true },
-    categoria: {
-      grupo: { type: String, required: true, trim: true },
-      subgrupo: { type: String, required: false, trim: true },
-    },
-    tipo: {
-      type: String,
-      enum: ["ingreso", "egreso"],
-      required: true,
-    },
-    monto: { type: Number, required: true, min: 0 },
-    saldo: { type: Number, required: false },
-    nota: { type: String, required: false, trim: true },
+    grupo: { type: String, required: true, trim: true },
+    subgrupo: { type: String, trim: true },
   },
   { _id: false }
 );
 
-movementSchema.pre("validate", function (next) {
-  if (typeof this.monto === "number" && this.monto < 0) {
-    this.monto = Math.abs(this.monto);
-  }
-  next();
-});
-
-const datasetSchema = new Schema(
+const MovementSchema = new mongoose.Schema(
   {
-    datasetName: { type: String, required: true, trim: true },
-    originalFileName: { type: String, required: false, trim: true },
+    fecha: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [
+        /^\d{2}\/\d{2}\/\d{2}(\d{2})?$/,
+        "Formato de fecha inválido (DD/MM/YY o DD/MM/YYYY)",
+      ],
+      set: (v) => String(v ?? "").trim(), // fuerza string
+    },
+    categoria: { type: CategorySchema, required: true },
+    tipo: { type: String, enum: ["ingreso", "egreso"], required: true },
+    monto: { type: Number, required: true },
+    saldo: { type: Number },
+    nota: { type: String, trim: true },
+    source: { type: String, trim: true },
+    externalId: { type: String, trim: true },
+  },
+  { _id: false }
+);
 
-    importedAt: { type: Date, default: Date.now, index: true },
-    importedBy: { type: String, required: false, trim: true },
-
-    periodStart: { type: Date, required: false, index: true },
-    periodEnd: { type: Date, required: false, index: true },
-
-    currency: { type: String, default: "ARS" },
-
+const CashDatasetSchema = new mongoose.Schema(
+  {
+    datasetName: { type: String, required: true, unique: true, trim: true },
+    originalFileName: { type: String, trim: true },
+    importedBy: { type: String, trim: true },
+    currency: { type: String, default: "ARS", trim: true },
     datasetType: {
       type: String,
-      required: false,
-      trim: true,
       enum: [
         "cashflow",
         "inventory",
@@ -52,36 +48,33 @@ const datasetSchema = new Schema(
         "sales",
         "other",
       ],
+      default: "cashflow",
     },
-
-    movements: {
-      type: [movementSchema],
-      default: [],
-      validate: {
-        validator: function (arr) {
-          return Array.isArray(arr) && arr.length <= 50000;
-        },
-        message: "Demasiados movimientos en un solo dataset (máx 50k).",
-      },
+    periodStart: {
+      type: String,
+      trim: true,
+      match: [
+        /^\d{2}\/\d{2}\/\d{2}(\d{2})?$/,
+        "Formato de fecha inválido (DD/MM/YY o DD/MM/YYYY)",
+      ],
+      set: (v) => String(v ?? "").trim(),
     },
+    periodEnd: {
+      type: String,
+      trim: true,
+      match: [
+        /^\d{2}\/\d{2}\/\d{2}(\d{2})?$/,
+        "Formato de fecha inválido (DD/MM/YY o DD/MM/YYYY)",
+      ],
+      set: (v) => String(v ?? "").trim(),
+    },
+    movements: { type: [MovementSchema], default: [] },
   },
   {
-    timestamps: true,
-    versionKey: false,
+    timestamps: { createdAt: "importedAt", updatedAt: "updatedAt" },
   }
 );
 
-datasetSchema.index({ datasetName: 1, importedAt: -1 });
-datasetSchema.index({ "movements.fecha": 1 });
-datasetSchema.index({ "movements.tipo": 1 });
-datasetSchema.index({
-  "movements.categoria.grupo": 1,
-  "movements.categoria.subgrupo": 1,
-});
+const CashDataset = mongoose.model("CashDataset", CashDatasetSchema);
 
-const CashDataset = model("CashDataset", datasetSchema);
-
-module.exports = {
-  CashDataset,
-  movementSchema,
-};
+module.exports = { CashDataset };
