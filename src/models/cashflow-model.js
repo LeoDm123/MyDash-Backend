@@ -26,7 +26,7 @@ const MovementSchema = new mongoose.Schema(
     saldo: { type: Number },
     nota: { type: String, trim: true },
     source: { type: String, trim: true },
-    externalId: { type: String, trim: true },
+    identificador: { type: String, trim: true },
   },
   { _id: false }
 );
